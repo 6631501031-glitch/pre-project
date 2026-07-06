@@ -1,0 +1,14 @@
+{
+  "name": "graduation-system-using-face-recognition",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node scripts/start-local.js",
+    "start:local": "node scripts/start-local.js",
+    "start:backend": "npm --prefix backend-node run start:local",
+    "start:frontend": "npm --prefix frontend-vue run serve:local -- --port 8080",
+    "test": "echo \"No root test suite configured. Run backend-node or frontend-vue tests directly.\""
+  },
+  "private": true
+}
