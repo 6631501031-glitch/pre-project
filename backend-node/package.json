@@ -14,6 +14,8 @@
     "smoke:live:user": "node -r dotenv/config scripts/live-smoke-graduationsystemusingfacerecognition-user-flow.js dotenv_config_path=.env.local",
     "import:graduate-csv": "node -r dotenv/config scripts/import-graduate-registrations-csv.js",
     "import:graduate-csv:local": "node -r dotenv/config scripts/import-graduate-registrations-csv.js dotenv_config_path=.env.local",
+    "import:graduate-xlsx": "node -r dotenv/config scripts/import-graduate-registrations-xlsx.js",
+    "import:graduate-xlsx:local": "node -r dotenv/config scripts/import-graduate-registrations-xlsx.js dotenv_config_path=.env.local",
     "init:core": "node -r dotenv/config scripts/init-graduationsystemusingfacerecognition-core.js",
     "bootstrap": "npm run bootstrap:iam",
     "bootstrap:local": "npm run bootstrap:iam:local",

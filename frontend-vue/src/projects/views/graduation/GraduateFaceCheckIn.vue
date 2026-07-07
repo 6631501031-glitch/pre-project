@@ -25,11 +25,11 @@
               </div>
               <div>
                 <span>สำนักวิชา</span>
-                <strong>{{ form.school || '-' }}</strong>
+                <strong>{{ displaySchool || '-' }}</strong>
               </div>
               <div>
                 <span>สาขา</span>
-                <strong>{{ form.program || '-' }}</strong>
+                <strong>{{ displayProgram || '-' }}</strong>
               </div>
             </div>
           </CCardBody>
@@ -93,7 +93,9 @@ function emptyForm () {
     lastName: '',
     phone: '',
     school: '',
-    program: ''
+    schoolEnglish: '',
+    program: '',
+    programEnglish: ''
   }
 }
 
@@ -113,6 +115,15 @@ export default {
   computed: {
     fullName () {
       return [this.form.firstName, this.form.lastName].filter(Boolean).join(' ')
+    },
+    isEnglishLocale () {
+      return String((this.$i18n && this.$i18n.locale) || '').toLowerCase().startsWith('en')
+    },
+    displaySchool () {
+      return this.isEnglishLocale && this.form.schoolEnglish ? this.form.schoolEnglish : this.form.school
+    },
+    displayProgram () {
+      return this.isEnglishLocale && this.form.programEnglish ? this.form.programEnglish : this.form.program
     },
     barcodeValue () {
       const base = [this.form.firstName, this.form.lastName, this.form.phone]

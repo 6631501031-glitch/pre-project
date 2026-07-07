@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const GRADUATIONSYSTEMUSINGFACERECOGNITIONGRADUATIONSYSTEMUSINGFACERECOGNITIONDocument = require('../models/graduationsystemusingfacerecognition_document.model');
 
 const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 200;
+const MAX_LIMIT = 4000;
 
 function toNumber(value, fallback) {
   const parsed = Number(value);

@@ -30,7 +30,9 @@ const graduateRegistrationSchema = new Schema({
   phone: { type: String, trim: true, default: null, index: true },
   email: { type: String, trim: true, lowercase: true, default: null },
   school: { type: String, trim: true, default: null, index: true },
+  schoolEnglish: { type: String, trim: true, default: null, index: true },
   program: { type: String, trim: true, default: null, index: true },
+  programEnglish: { type: String, trim: true, default: null, index: true },
   homeAddress: { type: addressSchema, default: () => ({}) },
   currentAddress: { type: addressSchema, default: () => ({}) },
   workAddress: { type: addressSchema, default: () => ({}) },
@@ -57,7 +59,9 @@ graduateRegistrationSchema.index({
   phone: 'text',
   email: 'text',
   school: 'text',
+  schoolEnglish: 'text',
   program: 'text',
+  programEnglish: 'text',
   barcodeValue: 'text'
 });
 

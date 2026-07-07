@@ -39,6 +39,14 @@ router.get('/registrations/me/defaults', async function (request, response) {
   }
 });
 
+router.get('/registrations/options', canViewRegistry, async function (request, response) {
+  try {
+    return ok(response, await graduateRegistration.options());
+  } catch (error) {
+    return fail(response, error);
+  }
+});
+
 router.get('/documents', canViewRegistry, async function (request, response) {
   try {
     return ok(response, await graduationsystemusingfacerecognitionDocument.list(request.query || {}));

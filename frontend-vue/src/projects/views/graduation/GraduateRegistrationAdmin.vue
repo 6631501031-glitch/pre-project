@@ -85,8 +85,8 @@
                   <small>{{ item.barcodeValue || '-' }}</small>
                 </td>
                 <td>
-                  <strong>{{ item.school || '-' }}</strong>
-                  <span>{{ item.program || '-' }}</span>
+                  <strong>{{ localizedSchool(item) || '-' }}</strong>
+                  <span>{{ localizedProgram(item) || '-' }}</span>
                 </td>
                 <td>
                   <CBadge :color="ceremonyStatusColor(item.ceremonyStatus)">
@@ -127,7 +127,7 @@
         </div>
         <div>
           <span>{{ $t('graduation.admin.details.schoolProgram') }}</span>
-          <strong>{{ selectedRegistration.school || '-' }} / {{ selectedRegistration.program || '-' }}</strong>
+          <strong>{{ localizedSchool(selectedRegistration) || '-' }} / {{ localizedProgram(selectedRegistration) || '-' }}</strong>
         </div>
         <div>
           <span>{{ $t('graduation.admin.details.ceremonyStatus') }}</span>
@@ -214,10 +214,17 @@ function cleanTextOption(value) {
   return normalized && normalized !== '-' ? normalized : ''
 }
 
-function uniqueOptions(values) {
-  return [...new Set(values.map(cleanTextOption).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b, 'th'))
-    .map(value => ({ label: value, value }))
+function uniqueLocalizedOptions(rows, valueKey, labelKey, isEnglish) {
+  const map = new Map()
+  ;(rows || []).forEach(item => {
+    const value = cleanTextOption(item && item[valueKey])
+    if (!value || map.has(value)) return
+    const label = isEnglish ? cleanTextOption(item && item[labelKey]) || value : value
+    map.set(value, label)
+  })
+  return Array.from(map.entries())
+    .sort((left, right) => left[1].localeCompare(right[1], isEnglish ? 'en' : 'th'))
+    .map(([value, label]) => ({ value, label }))
 }
 
 export default {
@@ -240,6 +247,9 @@ export default {
     }
   },
   computed: {
+    isEnglishLocale () {
+      return String((this.$i18n && this.$i18n.locale) || '').toLowerCase().startsWith('en')
+    },
     localizedCeremonyStatusFilterOptions () {
       return [
         { label: this.$t('graduation.admin.filters.allStatuses'), value: 'all' },
@@ -252,7 +262,7 @@ export default {
     schoolFilterOptions () {
       return [
         { label: this.$t('graduation.admin.filters.allSchools'), value: 'all' },
-        ...uniqueOptions(this.filterSourceRegistrations.map(item => item.school))
+        ...uniqueLocalizedOptions(this.filterSourceRegistrations, 'school', 'schoolEnglish', this.isEnglishLocale)
       ]
     },
     programFilterOptions () {
@@ -262,7 +272,7 @@ export default {
         : this.filterSourceRegistrations
       return [
         { label: this.$t('graduation.admin.filters.allPrograms'), value: 'all' },
-        ...uniqueOptions(rows.map(item => item.program))
+        ...uniqueLocalizedOptions(rows, 'program', 'programEnglish', this.isEnglishLocale)
       ]
     },
     statCards () {
@@ -285,7 +295,7 @@ export default {
   methods: {
     async fetchFilterSourceRegistrations () {
       try {
-        const response = await api.graduateRegistrations('list', { limit: 200 })
+        const response = await api.graduateRegistrations('list', { limit: 4000 })
         const data = unwrap(response)
         this.filterSourceRegistrations = Array.isArray(data.rows) ? data.rows : []
       } catch (error) {
@@ -301,7 +311,7 @@ export default {
           school: this.filters.school,
           program: this.filters.program,
           ceremonyStatus: this.filters.ceremonyStatus,
-          limit: 200
+          limit: 4000
         })
         const data = unwrap(response)
         this.registrations = Array.isArray(data.rows) ? data.rows : []
@@ -347,6 +357,16 @@ export default {
     },
     fullName (item) {
       return [item && item.firstName, item && item.lastName].filter(Boolean).join(' ')
+    },
+    localizedSchool (item) {
+      return this.isEnglishLocale && cleanTextOption(item && item.schoolEnglish)
+        ? cleanTextOption(item.schoolEnglish)
+        : cleanTextOption(item && item.school)
+    },
+    localizedProgram (item) {
+      return this.isEnglishLocale && cleanTextOption(item && item.programEnglish)
+        ? cleanTextOption(item.programEnglish)
+        : cleanTextOption(item && item.program)
     },
     pronunciationLabel (item) {
       const combined = [item && item.firstNamePronunciation, item && item.lastNamePronunciation].filter(Boolean).join(' ')

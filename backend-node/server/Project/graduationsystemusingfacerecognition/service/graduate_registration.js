@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const GraduateRegistration = require('../models/graduate_registration.model');
 
 const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 200;
+const MAX_LIMIT = 4000;
 
 function toNumber(value, fallback) {
   const parsed = Number(value);
@@ -88,7 +88,7 @@ function cleanAddress(value) {
 
 function serializeRegistration(row) {
   const item = Object.assign({}, row || {});
-  ['firstName', 'lastName', 'namePronunciation', 'firstNamePronunciation', 'lastNamePronunciation', 'phone', 'email', 'school', 'program', 'ceremonyStatus', 'ceremonyAssistanceType', 'ceremonyStatusNote', 'certificateDeliveryMethod', 'certificateShippingService', 'hasFoodAllergy', 'foodAllergyNote', 'barcodeValue'].forEach(function (field) {
+  ['firstName', 'lastName', 'namePronunciation', 'firstNamePronunciation', 'lastNamePronunciation', 'phone', 'email', 'school', 'schoolEnglish', 'program', 'programEnglish', 'ceremonyStatus', 'ceremonyAssistanceType', 'ceremonyStatusNote', 'certificateDeliveryMethod', 'certificateShippingService', 'hasFoodAllergy', 'foodAllergyNote', 'barcodeValue'].forEach(function (field) {
     item[field] = cleanText(item[field]);
   });
   item.homeAddress = cleanAddress(item.homeAddress);
@@ -166,7 +166,9 @@ function payloadFromBody(body) {
     phone: cleanText(body.phone),
     email: cleanText(body.email),
     school: cleanText(body.school),
+    schoolEnglish: cleanText(body.schoolEnglish),
     program: cleanText(body.program),
+    programEnglish: cleanText(body.programEnglish),
     homeAddress: cleanAddress(body.homeAddress),
     currentAddress: cleanAddress(body.currentAddress),
     workAddress: cleanAddress(body.workAddress),
@@ -244,6 +246,83 @@ exports.list = async function list(query) {
     limit,
     hasMore: skip + rows.length < total
   };
+};
+
+exports.options = async function options() {
+  const rows = await GraduateRegistration.aggregate([
+    {
+      $match: {
+        school: { $nin: [null, ''] }
+      }
+    },
+    {
+      $group: {
+        _id: {
+          school: '$school',
+          schoolEnglish: '$schoolEnglish',
+          programEnglish: '$programEnglish',
+          program: '$program'
+        }
+      }
+    }
+  ]);
+
+  const grouped = rows.reduce(function (acc, item) {
+    const school = cleanText(item && item._id && item._id.school);
+    const schoolEnglish = cleanText(item && item._id && item._id.schoolEnglish);
+    const program = cleanText(item && item._id && item._id.program);
+    const programEnglish = cleanText(item && item._id && item._id.programEnglish);
+    if (!school) return acc;
+    if (!acc[school]) {
+      acc[school] = {
+        school: school,
+        schoolEnglish: schoolEnglish,
+        programs: {}
+      };
+    }
+    if (!acc[school].schoolEnglish && schoolEnglish) acc[school].schoolEnglish = schoolEnglish;
+    if (program) {
+      if (!acc[school].programs[program]) {
+        acc[school].programs[program] = {
+          program: program,
+          programEnglish: programEnglish
+        };
+      }
+      if (!acc[school].programs[program].programEnglish && programEnglish) {
+        acc[school].programs[program].programEnglish = programEnglish;
+      }
+    }
+    return acc;
+  }, {});
+
+  const schools = Object.keys(grouped)
+    .sort(function (left, right) {
+      return left.localeCompare(right, 'th');
+    })
+    .map(function (school) {
+      const item = grouped[school];
+      return {
+        school: item.school,
+        schoolEnglish: item.schoolEnglish || null,
+        labelTh: item.school,
+        labelEn: item.schoolEnglish || item.school,
+        programs: Object.keys(item.programs)
+          .sort(function (left, right) {
+            return left.localeCompare(right, 'th');
+          })
+          .map(function (program) {
+            const programItem = item.programs[program];
+            return {
+              program: programItem.program,
+              programEnglish: programItem.programEnglish || null,
+              labelTh: programItem.program,
+              labelEn: programItem.programEnglish || programItem.program
+            };
+          })
+      };
+    });
+
+  return { schools: schools };
 };
 
 exports.defaultsForAccount = async function defaultsForAccount(request, query) {

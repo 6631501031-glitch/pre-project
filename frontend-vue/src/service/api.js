@@ -328,6 +328,8 @@ export default {
 
   graduateRegistrations(method, data) {
     switch (method) {
+      case 'options':
+        return instance.get('/api/v1/graduationsystemusingfacerecognition/registrations/options', { params: data || {} });
       case 'defaults':
         return instance.get('/api/v1/graduationsystemusingfacerecognition/registrations/me/defaults', { params: data || {} });
       case 'list':

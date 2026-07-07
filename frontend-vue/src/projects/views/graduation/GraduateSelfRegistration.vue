@@ -23,11 +23,11 @@
             </div>
             <CRow>
               <CCol md="6">
-                <CInput ref="firstNameField" v-model.trim="form.firstName" :label="$t('graduation.fields.firstName')" :readonly="isLockedField('firstName')" :class="[{ 'is-invalid': hasFieldError('firstName') }, { 'readonly-white': isLockedField('firstName') }]" />
+                <CInput ref="firstNameField" v-model.trim="form.firstName" :label="$t('graduation.fields.firstName')" :class="{ 'is-invalid': hasFieldError('firstName') }" />
                 <div v-if="hasFieldError('firstName')" class="invalid-feedback d-block">{{ validationErrors.firstName }}</div>
               </CCol>
               <CCol md="6">
-                <CInput ref="lastNameField" v-model.trim="form.lastName" :label="$t('graduation.fields.lastName')" :readonly="isLockedField('lastName')" :class="[{ 'is-invalid': hasFieldError('lastName') }, { 'readonly-white': isLockedField('lastName') }]" />
+                <CInput ref="lastNameField" v-model.trim="form.lastName" :label="$t('graduation.fields.lastName')" :class="{ 'is-invalid': hasFieldError('lastName') }" />
                 <div v-if="hasFieldError('lastName')" class="invalid-feedback d-block">{{ validationErrors.lastName }}</div>
               </CCol>
               <CCol md="6">
@@ -39,7 +39,7 @@
                 <div v-if="hasFieldError('lastNamePronunciation')" class="invalid-feedback d-block">{{ validationErrors.lastNamePronunciation }}</div>
               </CCol>
               <CCol md="6">
-                <CInput ref="phoneField" v-model.trim="form.phone" :label="$t('graduation.fields.phone')" :readonly="isLockedField('phone')" :class="[{ 'is-invalid': hasFieldError('phone') }, { 'readonly-white': isLockedField('phone') }]" />
+                <CInput ref="phoneField" v-model.trim="form.phone" :label="$t('graduation.fields.phone')" :class="{ 'is-invalid': hasFieldError('phone') }" />
                 <div v-if="hasFieldError('phone')" class="invalid-feedback d-block">{{ validationErrors.phone }}</div>
               </CCol>
               <CCol md="6">
@@ -56,22 +56,28 @@
             </div>
             <CRow>
               <CCol md="6">
-                <CInput
+                <CSelect
                   ref="schoolField"
                   v-model="form.school"
                   :label="$t('graduation.fields.school')"
-                  readonly
-                  :class="[{ 'is-invalid': hasFieldError('school') }, 'readonly-white']"
+                  :options="schoolOptions"
+                  :class="{ 'is-invalid': hasFieldError('school') }"
+                  @input="onSchoolInput"
+                  @change="onSchoolInput"
                 />
                 <div v-if="hasFieldError('school')" class="invalid-feedback d-block">{{ validationErrors.school }}</div>
               </CCol>
               <CCol md="6">
-                <CInput
+                <CSelect
                   ref="programField"
+                  :key="programSelectKey"
                   v-model="form.program"
                   :label="$t('graduation.fields.program')"
-                  readonly
-                  :class="[{ 'is-invalid': hasFieldError('program') }, 'readonly-white']"
+                  :options="programOptions"
+                  :disabled="!form.school"
+                  :class="{ 'is-invalid': hasFieldError('program') }"
+                  @input="onProgramInput"
+                  @change="onProgramInput"
                 />
                 <div v-if="hasFieldError('program')" class="invalid-feedback d-block">{{ validationErrors.program }}</div>
               </CCol>
@@ -238,11 +244,11 @@
               </div>
               <div>
                 <span>{{ $t('graduation.fields.school') }}</span>
-                <strong>{{ form.school || '-' }}</strong>
+                <strong>{{ summarySchool || '-' }}</strong>
               </div>
               <div>
                 <span>{{ $t('graduation.fields.programShort') }}</span>
-                <strong>{{ form.program || '-' }}</strong>
+                <strong>{{ summaryProgram || '-' }}</strong>
               </div>
               <div>
                 <span>{{ $t('graduation.self.summary.ceremonyStatus') }}</span>
@@ -401,6 +407,24 @@ function schoolKeyFor (school) {
   return Object.keys(THAI_SCHOOL_PROGRAMS).find(item => normalizeOptionValue(item) === normalized)
 }
 
+function schoolComparableValue (school) {
+  return normalizeOptionValue(textValue(school).replace(/^สำนักวิชา/, ''))
+}
+
+function localizedCatalogLabel (item, fallback, isEnglish) {
+  const source = item && typeof item === 'object' ? item : {}
+  if (isEnglish) {
+    return textValue(source.labelEn) ||
+      textValue(source.schoolEnglish) ||
+      textValue(source.programEnglish) ||
+      textValue(fallback)
+  }
+  return textValue(source.labelTh) ||
+    textValue(source.school) ||
+    textValue(source.program) ||
+    textValue(fallback)
+}
+
 const CEREMONY_STATUS_OPTIONS = [
   { value: '0', key: '0' },
   { value: '1', key: '1' },
@@ -455,7 +479,9 @@ const EMPTY_FORM = {
   phone: '',
   email: '',
   school: '',
+  schoolEnglish: '',
   program: '',
+  programEnglish: '',
   homeAddress: emptyAddress(),
   currentAddress: emptyAddress(),
   workAddress: emptyAddress(),
@@ -481,6 +507,7 @@ function textValue (value) {
     return preferred ? textValue(preferred.value) : ''
   }
   if (value && typeof value === 'object') {
+    if (value.target && value.target.value !== undefined) return textValue(value.target.value)
     if (value.value !== undefined) return textValue(value.value)
     if (value.label !== undefined) return textValue(value.label)
     if (value.name !== undefined) return textValue(value.name)
@@ -635,7 +662,10 @@ export default {
         currentAddress: false,
         workAddress: false
       },
+      schoolProgramCatalog: [],
       lastRegistrationLookupEmail: '',
+      currentRegistrationId: '',
+      currentRegistrationBarcodeValue: '',
       saving: false,
       foodAllergyAlertShown: false,
       validationAttempted: false
@@ -657,6 +687,15 @@ export default {
     namePronunciation () {
       return [this.form.firstNamePronunciation, this.form.lastNamePronunciation].filter(Boolean).join(' ')
     },
+    isEnglishLocale () {
+      return String((this.$i18n && this.$i18n.locale) || '').toLowerCase().startsWith('en')
+    },
+    summarySchool () {
+      return this.localizedSchoolName(this.form.school)
+    },
+    summaryProgram () {
+      return this.localizedProgramName(this.form.program)
+    },
     barcodeValue () {
       const base = [this.form.firstName, this.form.lastName, this.form.phone]
         .join('-')
@@ -665,17 +704,43 @@ export default {
       return `GRAD-${base || 'PENDING'}`
     },
     schoolOptions () {
+      const catalogSchools = this.schoolProgramCatalog.slice()
+      const fallbackSchools = catalogSchools.length ? [] : Object.keys(THAI_SCHOOL_PROGRAMS)
+        .map(item => ({ school: item, labelTh: item, labelEn: item }))
+      const schools = [...catalogSchools, ...fallbackSchools]
+      if (this.form.school && !schools.some(item => schoolComparableValue(item && item.school) === schoolComparableValue(this.form.school))) {
+        schools.push({ school: textValue(this.form.school), labelTh: textValue(this.form.school), labelEn: textValue(this.form.school) })
+      }
       return [
         { label: '', value: '' },
-        ...Object.keys(THAI_SCHOOL_PROGRAMS).map(item => ({ label: item, value: item }))
+        ...schools
+          .sort((left, right) => localizedCatalogLabel(left, left && left.school, this.isEnglishLocale).localeCompare(localizedCatalogLabel(right, right && right.school, this.isEnglishLocale), this.isEnglishLocale ? 'en' : 'th'))
+          .map(item => ({
+            label: localizedCatalogLabel(item, item && item.school, this.isEnglishLocale),
+            value: textValue(item && item.school)
+          }))
       ]
     },
     programOptions () {
+      const selectedSchoolKey = schoolComparableValue(this.form.school)
+      const catalogItem = this.schoolProgramCatalog.find(item => (
+        schoolComparableValue(item && item.school) === selectedSchoolKey
+      ))
       const schoolKey = schoolKeyFor(this.form.school)
-      const programs = schoolKey ? THAI_SCHOOL_PROGRAMS[schoolKey] : []
+      const catalogPrograms = catalogItem && Array.isArray(catalogItem.programs) ? catalogItem.programs : []
+      const fallbackPrograms = catalogPrograms.length ? [] : (schoolKey ? THAI_SCHOOL_PROGRAMS[schoolKey].map(item => ({ program: item, labelTh: item, labelEn: item })) : [])
+      const programs = [...catalogPrograms, ...fallbackPrograms]
+      if (this.form.program && !programs.some(item => normalizeOptionValue(item && item.program) === normalizeOptionValue(this.form.program))) {
+        programs.push({ program: textValue(this.form.program), labelTh: textValue(this.form.program), labelEn: textValue(this.form.program) })
+      }
       return [
         { label: '', value: '' },
-        ...programs.map(item => ({ label: item, value: item }))
+        ...programs
+          .sort((left, right) => localizedCatalogLabel(left, left && left.program, this.isEnglishLocale).localeCompare(localizedCatalogLabel(right, right && right.program, this.isEnglishLocale), this.isEnglishLocale ? 'en' : 'th'))
+          .map(item => ({
+            label: localizedCatalogLabel(item, item && item.program, this.isEnglishLocale),
+            value: textValue(item && item.program)
+          }))
       ]
     },
     programSelectKey () {
@@ -820,6 +885,7 @@ export default {
   mounted () {
     this.restoreDraft()
     this.applyProfileDefaults()
+    this.fetchRegistrationOptions()
     this.fetchRegistrationDefaults()
   },
   watch: {
@@ -835,6 +901,14 @@ export default {
       if (next !== normalizedSchool) {
         this.form.school = normalizedSchool
       }
+      this.syncCatalogLanguageFields()
+    },
+    'form.program' (next) {
+      const normalizedProgram = textValue(next)
+      if (next !== normalizedProgram) {
+        this.form.program = normalizedProgram
+      }
+      this.syncCatalogLanguageFields()
     },
     'form.ceremonyStatus' () {
       if (!this.requiresAssistanceType) {
@@ -937,15 +1011,69 @@ export default {
         .map(row => ({ row, score: this.registrationMatchScore(row) }))
         .sort((left, right) => right.score - left.score)[0]
     },
+    findCatalogSchool (school) {
+      const key = schoolComparableValue(school)
+      return this.schoolProgramCatalog.find(item => schoolComparableValue(item && item.school) === key) || null
+    },
+    findCatalogProgram (school, program) {
+      const schoolItem = this.findCatalogSchool(school)
+      const programs = schoolItem && Array.isArray(schoolItem.programs) ? schoolItem.programs : []
+      const key = normalizeOptionValue(program)
+      return programs.find(item => normalizeOptionValue(item && item.program) === key) || null
+    },
+    localizedSchoolName (school) {
+      const item = this.findCatalogSchool(school)
+      return localizedCatalogLabel(item, school, this.isEnglishLocale)
+    },
+    localizedProgramName (program) {
+      const item = this.findCatalogProgram(this.form.school, program)
+      return localizedCatalogLabel(item, program, this.isEnglishLocale)
+    },
+    syncCatalogLanguageFields () {
+      const schoolItem = this.findCatalogSchool(this.form.school)
+      const programItem = this.findCatalogProgram(this.form.school, this.form.program)
+      this.form.schoolEnglish = textValue(schoolItem && (schoolItem.schoolEnglish || schoolItem.labelEn)) || textValue(this.form.schoolEnglish)
+      this.form.programEnglish = textValue(programItem && (programItem.programEnglish || programItem.labelEn)) || textValue(this.form.programEnglish)
+    },
+    async fetchRegistrationOptions () {
+      try {
+        const response = await api.graduateRegistrations('options')
+        const data = response && response.data && response.data.data ? response.data.data : {}
+        const schools = Array.isArray(data.schools) ? data.schools : []
+        this.schoolProgramCatalog = schools
+          .map(item => ({
+            school: textValue(item && item.school),
+            schoolEnglish: textValue(item && item.schoolEnglish),
+            labelTh: textValue(item && item.labelTh) || textValue(item && item.school),
+            labelEn: textValue(item && item.labelEn) || textValue(item && item.schoolEnglish) || textValue(item && item.school),
+            programs: (Array.isArray(item && item.programs) ? item.programs : [])
+              .map(program => ({
+                program: textValue(program && program.program !== undefined ? program.program : program),
+                programEnglish: textValue(program && program.programEnglish),
+                labelTh: textValue(program && program.labelTh) || textValue(program && program.program !== undefined ? program.program : program),
+                labelEn: textValue(program && program.labelEn) || textValue(program && program.programEnglish) || textValue(program && program.program !== undefined ? program.program : program)
+              }))
+              .filter(program => program.program)
+          }))
+          .filter(item => item.school)
+        this.syncCatalogLanguageFields()
+      } catch (error) {
+        this.schoolProgramCatalog = []
+      }
+    },
     applyRegistrationDefaults (registration) {
-      const school = normalizeSchoolName(registration && registration.school)
+      const school = textValue(registration && registration.school) || normalizeSchoolName(registration && registration.school)
+      this.currentRegistrationId = textValue(registration && (registration._id || registration.id))
+      this.currentRegistrationBarcodeValue = textValue(registration && registration.barcodeValue)
       this.applyDefaults({
         firstName: textValue(registration && registration.firstName),
         lastName: textValue(registration && registration.lastName),
         phone: textValue(registration && registration.phone),
         email: textValue(registration && registration.email),
         school,
-        program: normalizeProgramName(school, registration && registration.program)
+        schoolEnglish: textValue(registration && registration.schoolEnglish),
+        program: normalizeProgramName(school, registration && registration.program),
+        programEnglish: textValue(registration && registration.programEnglish)
       }, { source: 'registration' })
       this.applyAddressDefaults(registration)
     },
@@ -962,16 +1090,20 @@ export default {
       })
       if (defaults.school) {
         this.form.school = defaults.school
+        this.form.schoolEnglish = defaults.schoolEnglish || ''
         this.$set(this.lockedFields, 'school', source)
       } else if (!textValue(this.form.school)) {
         this.form.school = ''
+        this.form.schoolEnglish = ''
         this.$delete(this.lockedFields, 'school')
       }
       if (defaults.program) {
         this.form.program = defaults.program
+        this.form.programEnglish = defaults.programEnglish || ''
         this.$set(this.lockedFields, 'program', source)
       } else if (!textValue(this.form.program)) {
         this.form.program = ''
+        this.form.programEnglish = ''
         this.$delete(this.lockedFields, 'program')
       }
     },
@@ -1020,7 +1152,18 @@ export default {
       if (this.form.school !== normalizedSchool) {
         this.form.school = normalizedSchool
       }
+      const schoolItem = this.findCatalogSchool(normalizedSchool)
+      this.form.schoolEnglish = textValue(schoolItem && (schoolItem.schoolEnglish || schoolItem.labelEn))
       this.form.program = ''
+      this.form.programEnglish = ''
+    },
+    onProgramInput (value) {
+      const normalizedProgram = textValue(value)
+      if (this.form.program !== normalizedProgram) {
+        this.form.program = normalizedProgram
+      }
+      const programItem = this.findCatalogProgram(this.form.school, normalizedProgram)
+      this.form.programEnglish = textValue(programItem && (programItem.programEnglish || programItem.labelEn))
     },
     onCeremonyStatusInput (value) {
       const ceremonyStatus = normalizeCode(value)
@@ -1112,18 +1255,35 @@ export default {
     },
     registrationPayload () {
       const hasFoodAllergy = normalizeYesNo(this.form.hasFoodAllergy)
+      const schoolItem = this.findCatalogSchool(this.form.school)
+      const programItem = this.findCatalogProgram(this.form.school, this.form.program)
       return Object.assign({}, this.form, {
         namePronunciation: this.namePronunciation,
+        school: textValue(this.form.school),
+        schoolEnglish: textValue(schoolItem && (schoolItem.schoolEnglish || schoolItem.labelEn)) || textValue(this.form.schoolEnglish),
+        program: textValue(this.form.program),
+        programEnglish: textValue(programItem && (programItem.programEnglish || programItem.labelEn)) || textValue(this.form.programEnglish),
         hasFoodAllergy,
         foodAllergyNote: hasFoodAllergy === 'yes' ? this.form.foodAllergyNote : '',
-        barcodeValue: this.barcodeValue
+        barcodeValue: this.currentRegistrationBarcodeValue || this.barcodeValue
       })
     },
     persistLocalDraft (savedRegistration) {
+      const savedId = savedRegistration && (savedRegistration._id || savedRegistration.id)
+        ? textValue(savedRegistration._id || savedRegistration.id)
+        : this.currentRegistrationId
+      const savedBarcode = savedRegistration && savedRegistration.barcodeValue
+        ? textValue(savedRegistration.barcodeValue)
+        : (this.currentRegistrationBarcodeValue || this.barcodeValue)
+      this.currentRegistrationId = savedId
+      this.currentRegistrationBarcodeValue = savedBarcode
       const payload = {
-        form: this.form,
-        barcodeValue: this.barcodeValue,
-        currentRegistrationId: savedRegistration && savedRegistration._id ? savedRegistration._id : '',
+        form: Object.assign({}, this.form, {
+          school: textValue(this.form.school),
+          program: textValue(this.form.program)
+        }),
+        barcodeValue: savedBarcode,
+        currentRegistrationId: savedId,
         savedAt: new Date().toISOString()
       }
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
@@ -1138,7 +1298,10 @@ export default {
       this.saving = true
       try {
         const payload = this.registrationPayload()
-        const response = await api.graduateRegistrations('create', payload)
+        const currentId = textValue(this.currentRegistrationId)
+        const response = currentId
+          ? await api.graduateRegistrations('update', Object.assign({ _id: currentId }, payload))
+          : await api.graduateRegistrations('create', payload)
         const saved = response && response.data && response.data.data ? response.data.data : null
         this.persistLocalDraft(saved)
         this.validationAttempted = false
@@ -1158,6 +1321,8 @@ export default {
         if (!raw) return
         const payload = JSON.parse(raw)
         const restored = Object.assign(cloneForm(), payload.form || {})
+        this.currentRegistrationId = textValue(payload.currentRegistrationId)
+        this.currentRegistrationBarcodeValue = textValue(payload.barcodeValue)
         if ((!restored.firstNamePronunciation || !restored.lastNamePronunciation) && restored.namePronunciation) {
           const parts = String(restored.namePronunciation).trim().split(/\s+/)
           if (!restored.firstNamePronunciation) restored.firstNamePronunciation = parts.shift() || ''
@@ -1167,6 +1332,10 @@ export default {
         restored.currentAddress = Object.assign(emptyAddress(), restored.currentAddress || {})
         restored.workAddress = Object.assign(emptyAddress(), restored.workAddress || {})
         restored.certificateDeliveryAddress = Object.assign(emptyAddress(), restored.certificateDeliveryAddress || {})
+        restored.school = textValue(restored.school)
+        restored.schoolEnglish = textValue(restored.schoolEnglish)
+        restored.program = textValue(restored.program)
+        restored.programEnglish = textValue(restored.programEnglish)
         const restoredCeremonyStatus = normalizeCode(restored.ceremonyStatus)
         if (CEREMONY_ASSISTANCE_TYPE_OPTIONS.some(item => item.value === restoredCeremonyStatus)) {
           restored.ceremonyAssistanceType = restoredCeremonyStatus
@@ -1189,6 +1358,8 @@ export default {
         this.form = restored
       } catch (error) {
         this.form = cloneForm()
+        this.currentRegistrationId = ''
+        this.currentRegistrationBarcodeValue = ''
       }
     },
     clearAllData () {
@@ -1196,6 +1367,8 @@ export default {
         return
       }
       this.form = cloneForm()
+      this.currentRegistrationId = ''
+      this.currentRegistrationBarcodeValue = ''
       this.resetAddressEditing()
       this.foodAllergyAlertShown = false
       this.validationAttempted = false
