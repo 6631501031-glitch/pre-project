@@ -26,34 +26,43 @@ const canActionLifecycle = authorization.requirePermission('/accounts/lifecycle'
   targetAccountId: (request) => request.params && request.params.id ? String(request.params.id) : ''
 });
 
+function isLocalStudentSession(request) {
+  return !!(request && request.authSession && request.authSession.source === 'local-student');
+}
+
 router.post("/signin", function (request, response) {
   return iamAdminClient.forwardScopedSignin(request, response);
 });
 router.get("/auth/me", Account.onCheckAuthorization, function (request, response) {
+  if (isLocalStudentSession(request)) return Account.onMe(request, response);
   return iamAdminClient.forwardUserRequest(request, response, {
     method: 'get',
     path: '/auth/me'
   });
 });
 router.get("/auth/sessions", Account.onCheckAuthorization, function (request, response) {
+  if (isLocalStudentSession(request)) return Account.onSessions(request, response);
   return iamAdminClient.forwardUserRequest(request, response, {
     method: 'get',
     path: '/auth/sessions'
   });
 });
 router.delete("/auth/sessions/:id", Account.onCheckAuthorization, function (request, response) {
+  if (isLocalStudentSession(request)) return Account.onRevokeSession(request, response);
   return iamAdminClient.forwardUserRequest(request, response, {
     method: 'delete',
     path: `/auth/sessions/${String(request.params && request.params.id ? request.params.id : '')}`
   });
 });
 router.post("/auth/logout", Account.onCheckAuthorization, function (request, response) {
+  if (isLocalStudentSession(request)) return Account.onLogout(request, response);
   return iamAdminClient.forwardUserRequest(request, response, {
     method: 'post',
     path: '/auth/logout'
   });
 });
 router.post("/auth/logout-all", Account.onCheckAuthorization, function (request, response) {
+  if (isLocalStudentSession(request)) return Account.onLogoutAll(request, response);
   return iamAdminClient.forwardUserRequest(request, response, {
     method: 'post',
     path: '/auth/logout-all'
@@ -78,18 +87,21 @@ router.put("/auth/profile-photo", Account.onCheckAuthorization, function (reques
   });
 });
 router.get("/auth/trusted-devices", Account.onCheckAuthorization, function (request, response) {
+  if (isLocalStudentSession(request)) return Account.onTrustedDevices(request, response);
   return iamAdminClient.forwardUserRequest(request, response, {
     method: 'get',
     path: '/auth/trusted-devices'
   });
 });
 router.post("/auth/trust-device", Account.onCheckAuthorization, function (request, response) {
+  if (isLocalStudentSession(request)) return Account.onTrustDevice(request, response);
   return iamAdminClient.forwardUserRequest(request, response, {
     method: 'post',
     path: '/auth/trust-device'
   });
 });
 router.delete("/auth/trusted-devices/:id", Account.onCheckAuthorization, function (request, response) {
+  if (isLocalStudentSession(request)) return Account.onRevokeTrustedDevice(request, response);
   return iamAdminClient.forwardUserRequest(request, response, {
     method: 'delete',
     path: `/auth/trusted-devices/${String(request.params && request.params.id ? request.params.id : '')}`

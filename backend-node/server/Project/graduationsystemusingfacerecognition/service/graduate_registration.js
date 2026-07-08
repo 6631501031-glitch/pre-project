@@ -32,6 +32,11 @@ function cleanText(value) {
   return normalized && normalized !== '[object Object]' ? normalized : null;
 }
 
+function cleanEmail(value) {
+  const normalized = cleanText(value);
+  return normalized ? normalized.toLowerCase() : null;
+}
+
 function cleanFacePhoto(value) {
   const normalized = cleanText(value);
   if (!normalized) return null;
@@ -54,9 +59,20 @@ function cleanCode(value) {
   return code ? code[0] : raw;
 }
 
+function cleanStudentCode(value) {
+  const normalized = cleanText(value);
+  if (!normalized || normalized.indexOf('@') !== -1) return null;
+  const digits = normalized.replace(/\D/g, '');
+  return digits && digits.length >= 4 ? digits : null;
+}
+
 function isMeaningfulFoodAllergyNote(value) {
   const normalized = String(value || '').trim();
   return !!normalized && normalized !== '-';
+}
+
+function requiresCertificateDeliveryStatus(value) {
+  return ['3', '50', '60'].includes(cleanCode(value));
 }
 
 function hasAnyAddressValue(address) {
@@ -103,6 +119,64 @@ function pushSearchTerm(terms, value) {
   if (normalized && !terms.includes(normalized)) terms.push(normalized);
 }
 
+function pushStudentCodeTerm(terms, value) {
+  const normalized = cleanStudentCode(value);
+  if (normalized && !terms.includes(normalized)) terms.push(normalized);
+}
+
+function pushEmailTerm(terms, value) {
+  const normalized = cleanEmail(value);
+  if (normalized && normalized.includes('@') && !terms.includes(normalized)) terms.push(normalized);
+}
+
+function queryStudentCodeTerms(query) {
+  const terms = [];
+  pushStudentCodeTerm(terms, query && query.studentCode);
+  pushStudentCodeTerm(terms, query && query.barcodeValue);
+  pushStudentCodeTerm(terms, query && query.username);
+  pushStudentCodeTerm(terms, query && query.code);
+  return terms;
+}
+
+function accountStudentCodeTerms(request, query) {
+  const account = request && request.authAccount ? request.authAccount : {};
+  const userinfo = account && account.userinfo && typeof account.userinfo === 'object' ? account.userinfo : {};
+  const lifecycle = account && account.lifecycle && typeof account.lifecycle === 'object' ? account.lifecycle : {};
+  const hrContext = account && account.hrContext && typeof account.hrContext === 'object' ? account.hrContext : {};
+  const authen = account && Array.isArray(account.authen) ? account.authen : [];
+  const terms = queryStudentCodeTerms(query);
+  pushStudentCodeTerm(terms, account.studentCode);
+  pushStudentCodeTerm(terms, account.barcodeValue);
+  pushStudentCodeTerm(terms, account.code);
+  pushStudentCodeTerm(terms, account.username);
+  pushStudentCodeTerm(terms, userinfo.studentCode);
+  pushStudentCodeTerm(terms, userinfo.code);
+  pushStudentCodeTerm(terms, lifecycle.hrSnapshot && lifecycle.hrSnapshot.personnelCode);
+  pushStudentCodeTerm(terms, hrContext.snapshot && hrContext.snapshot.personnelCode);
+  authen.forEach(function (item) {
+    pushStudentCodeTerm(terms, item && item.username);
+  });
+  return terms;
+}
+
+function accountEmailTerms(request, query) {
+  const account = request && request.authAccount ? request.authAccount : {};
+  const userinfo = account && account.userinfo && typeof account.userinfo === 'object' ? account.userinfo : {};
+  const authen = account && Array.isArray(account.authen) ? account.authen : [];
+  const terms = [];
+  pushEmailTerm(terms, account.email);
+  pushEmailTerm(terms, userinfo.email);
+  pushEmailTerm(terms, account.username);
+  authen.forEach(function (item) {
+    pushEmailTerm(terms, item && item.email);
+    pushEmailTerm(terms, item && item.username);
+  });
+  if (!terms.length) {
+    pushEmailTerm(terms, query && query.email);
+  }
+  return terms;
+}
+
 function accountSearchTerms(request, query) {
   const account = request && request.authAccount ? request.authAccount : {};
   const userinfo = account && account.userinfo && typeof account.userinfo === 'object' ? account.userinfo : {};
@@ -110,12 +184,16 @@ function accountSearchTerms(request, query) {
   pushSearchTerm(terms, account.email);
   pushSearchTerm(terms, account.username);
   pushSearchTerm(terms, account.code);
+  pushSearchTerm(terms, account.studentCode);
+  pushSearchTerm(terms, account.barcodeValue);
   pushSearchTerm(terms, userinfo.email);
   pushSearchTerm(terms, userinfo.phone);
   pushSearchTerm(terms, userinfo.mobile);
   pushSearchTerm(terms, userinfo.msisdn);
   pushSearchTerm(terms, userinfo.firstName);
   pushSearchTerm(terms, userinfo.lastName);
+  pushSearchTerm(terms, query && query.studentCode);
+  pushSearchTerm(terms, query && query.barcodeValue);
   pushSearchTerm(terms, query && query.email);
   pushSearchTerm(terms, query && query.phone);
   pushSearchTerm(terms, query && query.firstName);
@@ -128,9 +206,9 @@ function registrationScore(row, terms) {
     return String(term || '').toLowerCase();
   });
   let score = 0;
+  if (row.barcodeValue && normalizedTerms.includes(String(row.barcodeValue).toLowerCase())) score += 120;
   if (row.email && normalizedTerms.includes(String(row.email).toLowerCase())) score += 100;
   if (row.phone && normalizedTerms.includes(String(row.phone).toLowerCase())) score += 80;
-  if (row.barcodeValue && normalizedTerms.includes(String(row.barcodeValue).toLowerCase())) score += 60;
   if (row.firstName && normalizedTerms.includes(String(row.firstName).toLowerCase())) score += 30;
   if (row.lastName && normalizedTerms.includes(String(row.lastName).toLowerCase())) score += 30;
   return score;
@@ -150,13 +228,14 @@ function payloadFromBody(body) {
   const ceremonyStatus = cleanCode(body.ceremonyStatus);
   const ceremonyAssistanceType = cleanCode(body.ceremonyAssistanceType);
   const foodAllergyNote = cleanText(body.foodAllergyNote);
-  const certificateDeliveryMethod = ceremonyStatus === '3' ? cleanText(body.certificateDeliveryMethod) : null;
-  const certificateShippingService = certificateDeliveryMethod === 'postal' ? cleanText(body.certificateShippingService) : null;
   const firstNamePronunciation = cleanText(body.firstNamePronunciation);
   const lastNamePronunciation = cleanText(body.lastNamePronunciation);
   const namePronunciation = cleanText(body.namePronunciation) ||
     [firstNamePronunciation, lastNamePronunciation].filter(Boolean).join(' ') ||
     null;
+  const requiresCertificateDelivery = requiresCertificateDeliveryStatus(ceremonyStatus);
+  const certificateDeliveryMethod = requiresCertificateDelivery ? cleanText(body.certificateDeliveryMethod) : null;
+  const certificateShippingService = certificateDeliveryMethod === 'postal' ? cleanText(body.certificateShippingService) : null;
   return {
     firstName: cleanText(body.firstName),
     lastName: cleanText(body.lastName),
@@ -164,7 +243,7 @@ function payloadFromBody(body) {
     firstNamePronunciation: firstNamePronunciation,
     lastNamePronunciation: lastNamePronunciation,
     phone: cleanText(body.phone),
-    email: cleanText(body.email),
+    email: cleanEmail(body.email),
     school: cleanText(body.school),
     schoolEnglish: cleanText(body.schoolEnglish),
     program: cleanText(body.program),
@@ -191,10 +270,10 @@ function validatePayload(payload) {
   if (payload.hasFoodAllergy === 'yes' && !isMeaningfulFoodAllergyNote(payload.foodAllergyNote)) {
     missing.push('foodAllergyNote');
   }
-  if (payload.ceremonyStatus === '3' && !payload.certificateDeliveryMethod) {
+  if (requiresCertificateDeliveryStatus(payload.ceremonyStatus) && !payload.certificateDeliveryMethod) {
     missing.push('certificateDeliveryMethod');
   }
-  if (payload.ceremonyStatus === '3' && payload.certificateDeliveryMethod === 'postal') {
+  if (requiresCertificateDeliveryStatus(payload.ceremonyStatus) && payload.certificateDeliveryMethod === 'postal') {
     if (!payload.certificateShippingService) missing.push('certificateShippingService');
     if (!hasAnyAddressValue(payload.certificateDeliveryAddress)) missing.push('certificateDeliveryAddress');
   }
@@ -326,6 +405,23 @@ exports.options = async function options() {
 };
 
 exports.defaultsForAccount = async function defaultsForAccount(request, query) {
+  const studentCodeTerms = accountStudentCodeTerms(request || {}, query || {});
+  if (studentCodeTerms.length) {
+    const exactStudentRow = await GraduateRegistration.findOne({ barcodeValue: { $in: studentCodeTerms } })
+      .sort({ updatedAt: -1 })
+      .lean();
+    if (exactStudentRow) return serializeRegistration(exactStudentRow);
+    if (queryStudentCodeTerms(query || {}).length) return null;
+  }
+
+  const emailTerms = accountEmailTerms(request || {}, query || {});
+  if (emailTerms.length) {
+    const exactEmailRow = await GraduateRegistration.findOne({ email: { $in: emailTerms } })
+      .sort({ updatedAt: -1 })
+      .lean();
+    return exactEmailRow ? serializeRegistration(exactEmailRow) : null;
+  }
+
   const terms = accountSearchTerms(request || {}, query || {});
   if (!terms.length) return null;
 

@@ -122,6 +122,30 @@ function pickLangValue(items) {
     return found ? String(found.value) : '';
 }
 
+async function resolveLocalSession(accessToken) {
+    if (!accessToken) return null;
+    const account = await Account.onQuery({ 'control.device.xAccessToken': accessToken });
+    if (!account || !account._id || !account.control || !Array.isArray(account.control.device)) {
+        return null;
+    }
+    const session = account.control.device.find(function (item) {
+        return item && String(item.xAccessToken || '') === accessToken;
+    });
+    if (!session) return null;
+    const expiresAt = Number(session.expired_key || 0);
+    if (expiresAt && expiresAt < moment().unix()) {
+        await Account.onUpdate(
+            { _id: new mongo.ObjectId(account._id) },
+            { $pull: { 'control.device': { xAccessToken: accessToken } } }
+        );
+        return null;
+    }
+    return {
+        account: account,
+        session: session
+    };
+}
+
 
 exports.onCheckAuthorization = async function (request, response, next) {
     try {
@@ -133,9 +157,28 @@ exports.onCheckAuthorization = async function (request, response, next) {
             return response.status(401).json(missingTokenRes);
         }
 
-        const current = await iamAdminClient.resolveCurrentAccount(request);
+        let current = null;
+        try {
+            current = await iamAdminClient.resolveCurrentAccount(request);
+        } catch (iamError) {
+            current = null;
+        }
         const account = current && current.account ? current.account : null;
         if (!account || !account._id) {
+            const local = await resolveLocalSession(accessToken);
+            if (local && local.account && local.account._id) {
+                if (!request.body || typeof request.body !== 'object') {
+                    request.body = {};
+                }
+                request.body.accounts = String(local.account._id);
+                request.authAccount = local.account;
+                request.authSession = {
+                    source: 'local-student',
+                    token: accessToken,
+                    device: local.session
+                };
+                return next();
+            }
             var unauthorizedRes = await resMsg.onMessage_Response(0,40100);
             return response.status(401).json(unauthorizedRes);
         }

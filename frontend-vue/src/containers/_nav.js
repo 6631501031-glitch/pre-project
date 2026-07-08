@@ -33,6 +33,13 @@ export default function buildNav (t) {
         },
         {
           _name: 'CSidebarNavItem',
+          name: 'ศูนย์ควบคุมงานรับปริญญา',
+          to: '/graduation/admin-workspace',
+          icon: 'cil-clipboard',
+          permission: { path: '/graduation-system-using-face-recognition/registry', action: 'view' }
+        },
+        {
+          _name: 'CSidebarNavItem',
           name: t('nav.businessOperations'),
           to: '/operations/business',
           icon: 'cil-layers',
