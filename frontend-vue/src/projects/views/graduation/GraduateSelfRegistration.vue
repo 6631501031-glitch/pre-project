@@ -22,24 +22,72 @@
               <h2>{{ $t('graduation.self.sections.name') }}</h2>
             </div>
             <CRow>
-              <CCol md="6">
-                <CInput ref="firstNameField" v-model.trim="form.firstName" :label="$t('graduation.fields.firstName')" :class="{ 'is-invalid': hasFieldError('firstName') }" />
+              <CCol md="6" class="required-field">
+                <CInput
+                  ref="firstNameField"
+                  v-model.trim="form.firstName"
+                  :label="$t('graduation.fields.firstName')"
+                  :readonly="isLockedField('firstName')"
+                  :tabindex="isLockedField('firstName') ? -1 : 0"
+                  :class="[{ 'is-invalid': hasFieldError('firstName') }, { 'readonly-white': isLockedField('firstName') }]"
+                />
                 <div v-if="hasFieldError('firstName')" class="invalid-feedback d-block">{{ validationErrors.firstName }}</div>
               </CCol>
-              <CCol md="6">
-                <CInput ref="lastNameField" v-model.trim="form.lastName" :label="$t('graduation.fields.lastName')" :class="{ 'is-invalid': hasFieldError('lastName') }" />
+              <CCol md="6" class="required-field">
+                <CInput
+                  ref="lastNameField"
+                  v-model.trim="form.lastName"
+                  :label="$t('graduation.fields.lastName')"
+                  :readonly="isLockedField('lastName')"
+                  :tabindex="isLockedField('lastName') ? -1 : 0"
+                  :class="[{ 'is-invalid': hasFieldError('lastName') }, { 'readonly-white': isLockedField('lastName') }]"
+                />
                 <div v-if="hasFieldError('lastName')" class="invalid-feedback d-block">{{ validationErrors.lastName }}</div>
               </CCol>
-              <CCol md="6">
-                <CInput ref="firstNamePronunciationField" v-model.trim="form.firstNamePronunciation" :label="$t('graduation.fields.firstNamePronunciation')" :class="{ 'is-invalid': hasFieldError('firstNamePronunciation') }" />
+              <CCol md="6" class="required-field">
+                <CInput
+                  ref="firstNamePronunciationField"
+                  v-model.trim="form.firstNamePronunciation"
+                  :label="$t('graduation.fields.firstNamePronunciation')"
+                  :class="{ 'is-invalid': hasFieldError('firstNamePronunciation') }"
+                  @keydown.native="onPronunciationKeydown('firstNamePronunciation', $event)"
+                />
                 <div v-if="hasFieldError('firstNamePronunciation')" class="invalid-feedback d-block">{{ validationErrors.firstNamePronunciation }}</div>
               </CCol>
-              <CCol md="6">
-                <CInput ref="lastNamePronunciationField" v-model.trim="form.lastNamePronunciation" :label="$t('graduation.fields.lastNamePronunciation')" :class="{ 'is-invalid': hasFieldError('lastNamePronunciation') }" />
+              <CCol md="6" class="required-field">
+                <CInput
+                  ref="lastNamePronunciationField"
+                  v-model.trim="form.lastNamePronunciation"
+                  :label="$t('graduation.fields.lastNamePronunciation')"
+                  :class="{ 'is-invalid': hasFieldError('lastNamePronunciation') }"
+                  @keydown.native="onPronunciationKeydown('lastNamePronunciation', $event)"
+                />
                 <div v-if="hasFieldError('lastNamePronunciation')" class="invalid-feedback d-block">{{ validationErrors.lastNamePronunciation }}</div>
               </CCol>
               <CCol md="6">
-                <CInput ref="phoneField" v-model.trim="form.phone" :label="$t('graduation.fields.phone')" :class="{ 'is-invalid': hasFieldError('phone') }" />
+                <div ref="phoneField" class="phone-field" :class="{ 'is-invalid': hasFieldError('phone') }">
+                  <label class="phone-field__label">{{ $t('graduation.fields.phone') }}<span class="required-mark">*</span></label>
+                  <div class="phone-field__control">
+                    <CSelect
+                      v-model="phoneCountry"
+                      :options="phoneCountryOptions"
+                      class="phone-country-select"
+                      @input="onPhoneCountryInput"
+                      @change="onPhoneCountryInput"
+                    />
+                    <div class="phone-dial-code">{{ phoneDialCode }}</div>
+                    <CInput
+                      v-model="phoneLocalNumber"
+                      type="tel"
+                      inputmode="numeric"
+                      pattern="[0-9]*"
+                      placeholder="812345678"
+                      class="phone-local-input"
+                      @keydown.native="onPhoneNumberKeydown"
+                      @paste.native="onPhoneNumberPaste"
+                    />
+                  </div>
+                </div>
                 <div v-if="hasFieldError('phone')" class="invalid-feedback d-block">{{ validationErrors.phone }}</div>
               </CCol>
               <CCol md="6">
@@ -55,7 +103,7 @@
               <h2>{{ $t('graduation.self.sections.school') }}</h2>
             </div>
             <CRow>
-              <CCol md="6">
+              <CCol md="6" class="required-field">
                 <CSelect
                   ref="schoolField"
                   v-model="form.school"
@@ -67,7 +115,7 @@
                 />
                 <div v-if="hasFieldError('school')" class="invalid-feedback d-block">{{ validationErrors.school }}</div>
               </CCol>
-              <CCol md="6">
+              <CCol md="6" class="required-field">
                 <CSelect
                   ref="programField"
                   :key="programSelectKey"
@@ -85,61 +133,73 @@
           </CCardBody>
         </CCard>
 
-        <CCard class="registration-card address-section-card mt-3">
+        <CCard class="registration-card address-group-card mt-3">
           <CCardBody>
-            <AddressFields
-              :title="$t('graduation.address.home')"
-              :address="form.homeAddress"
-              :readonly="isAddressReadonly('homeAddress')"
-              @edit="enableAddressEdit('homeAddress')"
-              @save="saveAddressEdit('homeAddress')"
-            />
-          </CCardBody>
-        </CCard>
-
-        <CCard class="registration-card address-section-card mt-3">
-          <CCardBody>
-            <AddressFields
-              :title="$t('graduation.address.current')"
-              :address="form.currentAddress"
-              :readonly="isAddressReadonly('currentAddress')"
-              @edit="enableAddressEdit('currentAddress')"
-              @save="saveAddressEdit('currentAddress')"
-            />
-          </CCardBody>
-        </CCard>
-
-        <CCard class="registration-card address-section-card mt-3">
-          <CCardBody>
-            <AddressFields
-              :title="$t('graduation.address.work')"
-              :address="form.workAddress"
-              :readonly="isAddressReadonly('workAddress')"
-              @edit="enableAddressEdit('workAddress')"
-              @save="saveAddressEdit('workAddress')"
-            />
+            <div class="address-group-heading">
+              <h2>{{ addressGroupTitle }}</h2>
+              <p>{{ addressGroupDescription }}</p>
+            </div>
+            <div class="address-panel">
+              <AddressFields
+                :title="$t('graduation.address.current')"
+                :address="form.currentAddress"
+                :readonly="isAddressReadonly('currentAddress')"
+                :source-options="addressSourceOptions('currentAddress')"
+                :edit-label="addressEditLabel"
+                :save-label="addressSaveLabel"
+                @edit="enableAddressEdit('currentAddress')"
+                @select-source="onAddressSourceSelect('currentAddress', $event)"
+                @save="saveAddressEdit('currentAddress')"
+              />
+            </div>
+            <div class="address-panel">
+              <AddressFields
+                :title="$t('graduation.address.home')"
+                :address="form.homeAddress"
+                :readonly="isAddressReadonly('homeAddress')"
+                :source-options="addressSourceOptions('homeAddress')"
+                :edit-label="addressEditLabel"
+                :save-label="addressSaveLabel"
+                @edit="enableAddressEdit('homeAddress')"
+                @select-source="onAddressSourceSelect('homeAddress', $event)"
+                @save="saveAddressEdit('homeAddress')"
+              />
+            </div>
+            <div class="address-panel">
+              <AddressFields
+                :title="$t('graduation.address.work')"
+                :address="form.workAddress"
+                :readonly="isAddressReadonly('workAddress')"
+                :source-options="[]"
+                :edit-label="addressEditLabel"
+                :save-label="addressSaveLabel"
+                @edit="enableAddressEdit('workAddress')"
+                @select-source="onAddressSourceSelect('workAddress', $event)"
+                @save="saveAddressEdit('workAddress')"
+              />
+            </div>
           </CCardBody>
         </CCard>
 
         <CCard class="registration-card mt-3">
           <CCardBody>
-            <div class="section-heading">
-              <h2>{{ $t('graduation.self.sections.health') }}</h2>
+            <div class="section-heading ceremony-section-heading">
+              <h2>{{ $t('graduation.fields.ceremonyStatus') }}<span class="required-mark">*</span></h2>
             </div>
             <CRow>
               <CCol md="12">
                 <CSelect
                   ref="ceremonyStatusField"
                   v-model="form.ceremonyStatus"
-                  :label="$t('graduation.fields.ceremonyStatus')"
+                  :label="ceremonyStatusSelectLabel"
                   :options="ceremonyStatusOptions"
-                  :class="{ 'is-invalid': hasFieldError('ceremonyStatus') }"
+                  :class="['ceremony-status-select', { 'is-invalid': hasFieldError('ceremonyStatus') }]"
                   @input="onCeremonyStatusInput"
                   @change="onCeremonyStatusInput"
                 />
                 <div v-if="hasFieldError('ceremonyStatus')" class="invalid-feedback d-block">{{ validationErrors.ceremonyStatus }}</div>
               </CCol>
-              <CCol v-if="requiresAssistanceType" md="12">
+              <CCol v-if="requiresAssistanceType" md="12" class="required-field">
                 <CSelect
                   ref="ceremonyAssistanceTypeField"
                   :key="ceremonyAssistanceSelectKey"
@@ -167,29 +227,52 @@
                     v-model="form.certificateDeliveryMethod"
                     :label="$t('graduation.certificate.method')"
                     :options="certificateDeliveryMethodOptions"
-                    :class="{ 'is-invalid': hasFieldError('certificateDeliveryMethod') }"
+                    :class="['required-field', { 'is-invalid': hasFieldError('certificateDeliveryMethod') }]"
                     @input="onCertificateDeliveryMethodInput"
                     @change="onCertificateDeliveryMethodInput"
                   />
                   <div v-if="hasFieldError('certificateDeliveryMethod')" class="invalid-feedback d-block">{{ validationErrors.certificateDeliveryMethod }}</div>
                   <template v-if="requiresCertificateShipping">
-                    <CSelect
+                    <div
                       ref="certificateShippingServiceField"
-                      v-model="form.certificateShippingService"
-                      :label="$t('graduation.certificate.shippingService')"
-                      :options="certificateShippingServiceOptions"
+                      class="shipping-service-picker"
                       :class="{ 'is-invalid': hasFieldError('certificateShippingService') }"
-                    />
-                    <div v-if="hasFieldError('certificateShippingService')" class="invalid-feedback d-block">{{ validationErrors.certificateShippingService }}</div>
-                    <div class="shipping-rate-grid">
-                      <div v-for="item in certificateShippingRates" :key="item.value" class="shipping-rate-card">
-                        <strong>{{ item.label }}</strong>
-                        <span>{{ item.description }}</span>
-                        <em>{{ item.fee }}</em>
+                    >
+                      <div class="shipping-service-label">{{ $t('graduation.certificate.shippingService') }}<span class="required-mark">*</span></div>
+                      <div class="shipping-rate-grid">
+                        <button
+                          v-for="item in certificateShippingRates"
+                          :key="item.value"
+                          type="button"
+                          class="shipping-rate-card"
+                          :class="{ 'shipping-rate-card--selected': form.certificateShippingService === item.value }"
+                          :aria-pressed="form.certificateShippingService === item.value ? 'true' : 'false'"
+                          @click="selectCertificateShippingService(item.value)"
+                        >
+                          <span class="shipping-rate-card__check">
+                            <CIcon v-if="form.certificateShippingService === item.value" name="cil-check" />
+                          </span>
+                          <strong>{{ item.label }}</strong>
+                          <span>{{ item.description }}</span>
+                          <em>{{ item.fee }}</em>
+                        </button>
                       </div>
                     </div>
-                    <div ref="certificateDeliveryAddressField" :class="{ 'is-invalid': hasFieldError('certificateDeliveryAddress') }">
-                      <AddressFields :title="$t('graduation.certificate.deliveryAddress')" :address="form.certificateDeliveryAddress" />
+                    <div v-if="hasFieldError('certificateShippingService')" class="invalid-feedback d-block">{{ validationErrors.certificateShippingService }}</div>
+                    <div
+                      ref="certificateDeliveryAddressField"
+                      class="certificate-delivery-address"
+                      :class="{ 'is-invalid': hasFieldError('certificateDeliveryAddress') }"
+                    >
+                      <AddressFields
+                        :title="$t('graduation.certificate.deliveryAddress')"
+                        :address="form.certificateDeliveryAddress"
+                        :required="true"
+                        :source-options="addressSourceOptions('certificateDeliveryAddress')"
+                        :edit-label="addressEditLabel"
+                        :save-label="addressSaveLabel"
+                        @select-source="onAddressSourceSelect('certificateDeliveryAddress', $event)"
+                      />
                     </div>
                     <div v-if="hasFieldError('certificateDeliveryAddress')" class="invalid-feedback d-block">{{ validationErrors.certificateDeliveryAddress }}</div>
                   </template>
@@ -205,17 +288,19 @@
                 />
               </CCol>
             </CRow>
-            <CTextarea
-              ref="foodAllergyNoteField"
-              v-model.trim="form.foodAllergyNote"
-              :label="$t('graduation.fields.foodAllergyNote')"
-              rows="2"
-              :readonly="foodAllergyNoteDisabled"
-              :tabindex="foodAllergyNoteDisabled ? -1 : 0"
-              :class="[{ 'is-invalid': hasFieldError('foodAllergyNote') }, { 'readonly-white': foodAllergyNoteDisabled }]"
-            />
+            <div :class="{ 'required-field': requiresFoodAllergyNote }">
+              <CTextarea
+                ref="foodAllergyNoteField"
+                v-model.trim="form.foodAllergyNote"
+                :label="$t('graduation.fields.foodAllergyNote')"
+                rows="2"
+                :readonly="foodAllergyNoteDisabled"
+                :tabindex="foodAllergyNoteDisabled ? -1 : 0"
+                :class="[{ 'is-invalid': hasFieldError('foodAllergyNote') }, { 'readonly-white': foodAllergyNoteDisabled }]"
+              />
+            </div>
             <div v-if="requiresFoodAllergyNote" class="field-help-text">
-              กรุณาระบุอาหารที่แพ้หรือข้อควรระวังสำหรับการจัดอาหาร
+              {{ foodAllergyHelpText }}
             </div>
             <CAlert v-if="hasFieldError('foodAllergyNote')" color="danger" class="mt-2 mb-0">
               {{ $t('graduation.messages.foodAllergyRequired') }}
@@ -228,10 +313,18 @@
       </CCol>
 
       <CCol lg="4" class="mb-3">
-        <CCard class="registration-card sticky-summary">
+        <CCard class="registration-card sticky-summary summary-card">
           <CCardBody>
-            <div class="section-heading">
-              <h2>{{ $t('graduation.self.summary.title') }}</h2>
+            <div class="section-heading summary-heading">
+              <div>
+                <div class="summary-heading__icon">
+                  <CIcon name="cil-clipboard" />
+                </div>
+                <h2>{{ $t('graduation.self.summary.title') }}</h2>
+              </div>
+              <CBadge :color="completionColor" class="summary-badge">
+                {{ completionLabel }}
+              </CBadge>
             </div>
             <div class="summary-list">
               <div>
@@ -255,20 +348,23 @@
                 <strong>{{ ceremonyStatusLabel }}</strong>
               </div>
             </div>
+            <div class="summary-progress-label">
+              <span>{{ completionPercent }}%</span>
+              <em>{{ completionLabel }}</em>
+            </div>
             <div class="completion-meter">
               <span :style="{ width: completionPercent + '%' }"></span>
+            </div>
+            <div class="summary-actions">
+              <CButton color="primary" :disabled="saving" class="summary-save-button" @click="goToFacePage">
+                <CIcon name="cil-save" class="mr-2" />
+                {{ saving ? $t('graduation.self.actions.saving') : $t('graduation.self.actions.save') }}
+              </CButton>
             </div>
           </CCardBody>
         </CCard>
       </CCol>
     </CRow>
-
-    <div class="registration-bottom-actions">
-      <CButton color="primary" variant="outline" :disabled="saving" @click="goToFacePage">
-        <CIcon name="cil-save" class="mr-2" />
-        {{ saving ? $t('graduation.self.actions.saving') : $t('graduation.self.actions.save') }}
-      </CButton>
-    </div>
   </div>
 </template>
 
@@ -277,6 +373,12 @@ import api from '@/service/api'
 import { notifyError, notifySuccess } from '@/projects/utils/notify'
 
 const STORAGE_KEY = 'graduate-self-registration-draft'
+const GRADUATE_NAME_OVERRIDES = {
+  6631501034: {
+    firstName: 'ณัฐพร',
+    lastName: 'ดิบดี'
+  }
+}
 
 const VALIDATION_FIELD_ORDER = [
   'firstName',
@@ -402,6 +504,12 @@ function isAssistanceCeremonyStatus (value) {
   return normalizeCode(value) === '20'
 }
 
+function normalizeCeremonyStatus (value) {
+  const code = normalizeCode(value)
+  if (CEREMONY_STATUS_OPTIONS.some(item => item.value === code)) return code
+  return LEGACY_CEREMONY_STATUS_MAP[code] || ''
+}
+
 function schoolKeyFor (school) {
   const normalized = normalizeOptionValue(school)
   return Object.keys(THAI_SCHOOL_PROGRAMS).find(item => normalizeOptionValue(item) === normalized)
@@ -426,19 +534,20 @@ function localizedCatalogLabel (item, fallback, isEnglish) {
 }
 
 const CEREMONY_STATUS_OPTIONS = [
-  { value: '0', key: '0' },
-  { value: '1', key: '1' },
-  { value: '2', key: '2' },
-  { value: '3', key: '3' },
   { value: '10', key: '10' },
   { value: '20', key: '20' },
   { value: '30', key: '30' },
   { value: '40', key: '40' },
   { value: '50', key: '50' },
   { value: '60', key: '60' },
-  { value: '70', key: '70' },
-  { value: '80', key: '80' }
+  { value: '70', key: '70' }
 ]
+
+const LEGACY_CEREMONY_STATUS_MAP = {
+  1: '10',
+  2: '50',
+  3: '60'
+}
 
 const CEREMONY_ASSISTANCE_TYPE_OPTIONS = [
   { value: '21', key: '21' },
@@ -456,6 +565,51 @@ const CERTIFICATE_SHIPPING_SERVICE_OPTIONS = [
   { value: 'ems-domestic', fee: 120 },
   { value: 'ems-international', fee: 1200 }
 ]
+
+const PHONE_COUNTRY_OPTIONS = [
+  { value: 'TH', labelTh: 'ประเทศไทย', labelEn: 'Thailand', dialCode: '+66' },
+  { value: 'BN', labelTh: 'บรูไน', labelEn: 'Brunei', dialCode: '+673' },
+  { value: 'KH', labelTh: 'กัมพูชา', labelEn: 'Cambodia', dialCode: '+855' },
+  { value: 'CN', labelTh: 'จีน', labelEn: 'China', dialCode: '+86' },
+  { value: 'HK', labelTh: 'ฮ่องกง', labelEn: 'Hong Kong', dialCode: '+852' },
+  { value: 'IN', labelTh: 'อินเดีย', labelEn: 'India', dialCode: '+91' },
+  { value: 'ID', labelTh: 'อินโดนีเซีย', labelEn: 'Indonesia', dialCode: '+62' },
+  { value: 'JP', labelTh: 'ญี่ปุ่น', labelEn: 'Japan', dialCode: '+81' },
+  { value: 'LA', labelTh: 'ลาว', labelEn: 'Laos', dialCode: '+856' },
+  { value: 'MY', labelTh: 'มาเลเซีย', labelEn: 'Malaysia', dialCode: '+60' },
+  { value: 'MM', labelTh: 'เมียนมา', labelEn: 'Myanmar', dialCode: '+95' },
+  { value: 'PH', labelTh: 'ฟิลิปปินส์', labelEn: 'Philippines', dialCode: '+63' },
+  { value: 'SG', labelTh: 'สิงคโปร์', labelEn: 'Singapore', dialCode: '+65' },
+  { value: 'KR', labelTh: 'เกาหลีใต้', labelEn: 'South Korea', dialCode: '+82' },
+  { value: 'TW', labelTh: 'ไต้หวัน', labelEn: 'Taiwan', dialCode: '+886' },
+  { value: 'VN', labelTh: 'เวียดนาม', labelEn: 'Vietnam', dialCode: '+84' },
+  { value: 'AU', labelTh: 'ออสเตรเลีย', labelEn: 'Australia', dialCode: '+61' },
+  { value: 'NZ', labelTh: 'นิวซีแลนด์', labelEn: 'New Zealand', dialCode: '+64' },
+  { value: 'GB', labelTh: 'สหราชอาณาจักร', labelEn: 'United Kingdom', dialCode: '+44' },
+  { value: 'FR', labelTh: 'ฝรั่งเศส', labelEn: 'France', dialCode: '+33' },
+  { value: 'DE', labelTh: 'เยอรมนี', labelEn: 'Germany', dialCode: '+49' },
+  { value: 'IT', labelTh: 'อิตาลี', labelEn: 'Italy', dialCode: '+39' },
+  { value: 'RU', labelTh: 'รัสเซีย', labelEn: 'Russia', dialCode: '+7' },
+  { value: 'US', labelTh: 'สหรัฐอเมริกา/แคนาดา', labelEn: 'United States / Canada', dialCode: '+1' }
+]
+
+function normalizePhoneDigits (value) {
+  return String(value == null ? '' : value).replace(/\D/g, '')
+}
+
+function normalizeStudentCode (value) {
+  const raw = textValue(value)
+  if (!raw || raw.indexOf('@') !== -1) return ''
+  const digits = raw.replace(/\D/g, '')
+  return digits.length >= 4 ? digits : ''
+}
+
+function phoneDialDigits (country) {
+  return normalizePhoneDigits(country && country.dialCode)
+}
+
+const ADDRESS_SOURCE_KEYS = ['homeAddress', 'currentAddress', 'workAddress']
+const ADDRESS_COPY_SOURCE_KEYS = ['currentAddress', 'homeAddress']
 
 function emptyAddress () {
   return {
@@ -525,6 +679,119 @@ function firstText () {
   return ''
 }
 
+function containsThaiText (value) {
+  return /[\u0E00-\u0E7F]/.test(String(value || ''))
+}
+
+function localizedNameText () {
+  const thaiCandidates = []
+  const englishCandidates = []
+  const fallbackCandidates = []
+  for (let index = 0; index < arguments.length; index += 1) {
+    const value = arguments[index]
+    if (Array.isArray(value)) {
+      value.forEach(item => {
+        const text = textValue(item && item.value !== undefined ? item.value : item)
+        if (!text) return
+        const key = String(item && item.key ? item.key : '').toLowerCase()
+        if (key === 'th' || containsThaiText(text)) thaiCandidates.push(text)
+        else if (key === 'en' || /^[A-Za-z\s.'-]+$/.test(text)) englishCandidates.push(text)
+        else fallbackCandidates.push(text)
+      })
+      continue
+    }
+    const text = textValue(value)
+    if (!text) return
+    if (containsThaiText(text)) thaiCandidates.push(text)
+    else if (/^[A-Za-z\s.'-]+$/.test(text)) englishCandidates.push(text)
+    else fallbackCandidates.push(text)
+  }
+  return thaiCandidates[0] || englishCandidates[0] || fallbackCandidates[0] || ''
+}
+
+function normalizeProfileAddress (value) {
+  const source = value && typeof value === 'object' ? value : {}
+  const normalized = {
+    houseNo: firstText(source.houseNo, source.houseNumber, source.no, source.address, source.addressLine1, source.line1),
+    moo: firstText(source.moo, source.villageNo, source.mooNo),
+    soi: firstText(source.soi, source.alley),
+    road: firstText(source.road, source.street),
+    subdistrict: firstText(source.subdistrict, source.subDistrict, source.subDistrictName, source.subdistrictName),
+    district: firstText(source.district, source.districtName, source.amphoe),
+    province: firstText(source.province, source.provinceName),
+    postalCode: firstText(source.postalCode, source.zipcode, source.zipCode, source.postcode)
+  }
+  return Object.keys(normalized).some(key => !!normalized[key]) ? normalized : emptyAddress()
+}
+
+function firstProfileAddress () {
+  for (let index = 0; index < arguments.length; index += 1) {
+    const address = normalizeProfileAddress(arguments[index])
+    if (Object.keys(address).some(key => !!address[key])) return address
+  }
+  return emptyAddress()
+}
+
+function profileAddressDefaults (profile) {
+  const source = profile && typeof profile === 'object' ? profile : {}
+  const userinfo = source.userinfo && typeof source.userinfo === 'object' ? source.userinfo : {}
+  const snapshot = source.snapshot || userinfo.snapshot || {}
+  const addresses = Array.isArray(source.address) ? source.address : []
+  const userinfoAddresses = Array.isArray(userinfo.address) ? userinfo.address : []
+  return {
+    homeAddress: firstProfileAddress(source.homeAddress, source.registeredAddress, userinfo.homeAddress, userinfo.registeredAddress, snapshot.homeAddress, addresses[0], userinfoAddresses[0]),
+    currentAddress: firstProfileAddress(source.currentAddress, source.presentAddress, userinfo.currentAddress, userinfo.presentAddress, snapshot.currentAddress, addresses[1], userinfoAddresses[1]),
+    workAddress: firstProfileAddress(source.workAddress, userinfo.workAddress, snapshot.workAddress, addresses[2], userinfoAddresses[2])
+  }
+}
+
+function normalizeEmailText (value) {
+  const email = textValue(value).toLowerCase()
+  return email && email.indexOf('@') !== -1 ? email : ''
+}
+
+function profileEmail (profile) {
+  const source = profile && typeof profile === 'object' ? profile : {}
+  const userinfo = source.userinfo && typeof source.userinfo === 'object' ? source.userinfo : {}
+  const authen = Array.isArray(source.authen) ? source.authen : []
+  const candidates = [source.email, userinfo.email, source.username]
+  authen.forEach(item => {
+    candidates.push(item && item.email)
+    candidates.push(item && item.username)
+  })
+  for (let index = 0; index < candidates.length; index += 1) {
+    const email = normalizeEmailText(candidates[index])
+    if (email) return email
+  }
+  return ''
+}
+
+function profileStudentCode (profile) {
+  const source = profile && typeof profile === 'object' ? profile : {}
+  const userinfo = source.userinfo && typeof source.userinfo === 'object' ? source.userinfo : {}
+  const lifecycle = source.lifecycle && typeof source.lifecycle === 'object' ? source.lifecycle : {}
+  const hrContext = source.hrContext && typeof source.hrContext === 'object' ? source.hrContext : {}
+  const candidates = [
+    source.studentCode,
+    source.barcodeValue,
+    source.code,
+    source.username,
+    userinfo.studentCode,
+    userinfo.code,
+    lifecycle.hrSnapshot && lifecycle.hrSnapshot.personnelCode,
+    hrContext.snapshot && hrContext.snapshot.personnelCode
+  ]
+  const authen = Array.isArray(source.authen) ? source.authen : []
+  authen.forEach(item => {
+    candidates.push(item && item.username)
+  })
+  for (let index = 0; index < candidates.length; index += 1) {
+    const code = normalizeStudentCode(candidates[index])
+    if (code) return code
+  }
+  return ''
+}
+
 function normalizeSchoolName (value) {
   const normalized = textValue(value)
   if (!normalized) return ''
@@ -566,10 +833,10 @@ function profileRegistrationDefaults (profile) {
     snapshot.orgUnitName
   ))
   return {
-    firstName: firstText(source.firstName, source.givenName, userinfo.firstName),
-    lastName: firstText(source.lastName, source.familyName, userinfo.lastName),
+    firstName: localizedNameText(source.firstName, userinfo.firstName, snapshot.firstName, source.givenName, userinfo.givenName),
+    lastName: localizedNameText(source.lastName, userinfo.lastName, snapshot.lastName, source.familyName, userinfo.familyName),
     phone: firstText(source.phone, source.mobile, source.msisdn, userinfo.phone, userinfo.mobile, userinfo.msisdn),
-    email: firstText(source.email, userinfo.email, source.username),
+    email: profileEmail(source),
     school,
     program: normalizeProgramName(school, firstText(
       source.program,
@@ -593,48 +860,70 @@ export default {
       props: {
         title: { type: String, required: true },
         address: { type: Object, required: true },
-        readonly: { type: Boolean, default: false }
+        readonly: { type: Boolean, default: false },
+        required: { type: Boolean, default: false },
+        editLabel: { type: String, default: 'แก้ไข' },
+        saveLabel: { type: String, default: 'บันทึก' },
+        sourceOptions: {
+          type: Array,
+          default: () => []
+        }
       },
       template: `
         <div class="address-block" :class="{ 'readonly-white': readonly }">
-          <CButton
-            v-if="readonly"
-            color="primary"
-            variant="outline"
-            size="sm"
-            class="address-icon-button"
-            title="แก้ไข"
-            aria-label="แก้ไข"
-            @click="$emit('edit')"
-          >
-            <CIcon name="cil-pencil" />
-          </CButton>
           <div class="address-subsection">
-            <span>{{ title }}</span>
+            <span>{{ title }}<span v-if="required" class="required-mark">*</span></span>
+            <CButton
+              v-if="readonly"
+              color="primary"
+              variant="outline"
+              size="sm"
+              class="address-icon-button"
+              :title="editLabel"
+              :aria-label="editLabel"
+              @click="$emit('edit')"
+            >
+              <CIcon name="cil-pencil" />
+            </CButton>
           </div>
-          <CRow>
-            <CCol md="4">
+          <div v-if="sourceOptions.length" class="address-choice-buttons">
+            <CButton
+              v-for="option in sourceOptions"
+              :key="option.value"
+              type="button"
+              color="primary"
+              variant="outline"
+              size="sm"
+              class="address-choice-button"
+              @click="$emit('select-source', option.value)"
+            >
+              <CIcon name="cil-copy" class="mr-1" />
+              {{ option.label }}
+            </CButton>
+          </div>
+          <CRow class="address-grid">
+            <CCol md="3">
               <CInput v-model.trim="address.houseNo" :label="$t('graduation.address.fields.houseNo')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
             </CCol>
-            <CCol md="4">
+            <CCol md="3">
               <CInput v-model.trim="address.moo" :label="$t('graduation.address.fields.moo')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
             </CCol>
-            <CCol md="4">
-              <CInput v-model.trim="address.soi" :label="$t('graduation.address.fields.soi')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
-            </CCol>
-            <CCol md="6">
+            <CCol md="3">
               <CInput v-model.trim="address.road" :label="$t('graduation.address.fields.road')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
             </CCol>
-            <CCol md="6">
-              <CInput v-model.trim="address.subdistrict" :label="$t('graduation.address.fields.subdistrict')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
+            <CCol md="3">
+              <CInput v-model.trim="address.soi" :label="$t('graduation.address.fields.soi')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
             </CCol>
-            <CCol md="4">
+            <CCol md="3">
               <CInput v-model.trim="address.district" :label="$t('graduation.address.fields.district')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
             </CCol>
-            <CCol md="4">
+            <CCol md="3">
+              <CInput v-model.trim="address.subdistrict" :label="$t('graduation.address.fields.subdistrict')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
+            </CCol>
+            <CCol md="3">
               <CInput v-model.trim="address.province" :label="$t('graduation.address.fields.province')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
             </CCol>
-            <CCol md="4">
+            <CCol md="3">
               <CInput v-model.trim="address.postalCode" :label="$t('graduation.address.fields.postalCode')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
             </CCol>
           </CRow>
@@ -646,7 +935,7 @@ export default {
               class="address-save-button"
               @click="$emit('save')"
             >
-              บันทึก
+              {{ saveLabel }}
             </CButton>
           </div>
         </div>
@@ -656,6 +945,8 @@ export default {
   data () {
     return {
       form: cloneForm(),
+      phoneCountry: 'TH',
+      phoneLocalNumber: '',
       lockedFields: {},
       addressEditing: {
         homeAddress: false,
@@ -664,6 +955,7 @@ export default {
       },
       schoolProgramCatalog: [],
       lastRegistrationLookupEmail: '',
+      loadedDraftStorageKey: '',
       currentRegistrationId: '',
       currentRegistrationBarcodeValue: '',
       saving: false,
@@ -675,11 +967,38 @@ export default {
     currentProfile () {
       return this.$store && this.$store.getters ? this.$store.getters['auth/profile'] : null
     },
+    authEmail () {
+      return profileEmail(this.currentProfile)
+    },
+    authStudentCode () {
+      return profileStudentCode(this.currentProfile)
+    },
+    draftStorageKey () {
+      const profile = this.currentProfile || {}
+      const identity = this.authStudentCode || this.authEmail || textValue(profile._id || profile.id || profile.code || profile.username).toLowerCase() || 'anonymous'
+      return `${STORAGE_KEY}:${encodeURIComponent(identity)}`
+    },
     localizedYesNoOptions () {
       return [
         { label: this.$t('graduation.options.no'), value: 'no' },
         { label: this.$t('graduation.options.yes'), value: 'yes' }
       ]
+    },
+    phoneCountryOptions () {
+      return PHONE_COUNTRY_OPTIONS.map(item => ({
+        label: `${this.isEnglishLocale ? item.labelEn : item.labelTh} (${item.dialCode})`,
+        value: item.value
+      }))
+    },
+    selectedPhoneCountry () {
+      return PHONE_COUNTRY_OPTIONS.find(item => item.value === this.phoneCountry) || PHONE_COUNTRY_OPTIONS[0]
+    },
+    phoneDialCode () {
+      return this.selectedPhoneCountry.dialCode
+    },
+    composedPhone () {
+      const localNumber = normalizePhoneDigits(this.phoneLocalNumber)
+      return localNumber ? `${this.phoneDialCode} ${localNumber}` : ''
     },
     fullName () {
       return [this.form.firstName, this.form.lastName].filter(Boolean).join(' ')
@@ -689,6 +1008,28 @@ export default {
     },
     isEnglishLocale () {
       return String((this.$i18n && this.$i18n.locale) || '').toLowerCase().startsWith('en')
+    },
+    addressGroupTitle () {
+      return this.isEnglishLocale ? 'Address information' : 'ข้อมูลที่อยู่'
+    },
+    addressGroupDescription () {
+      return this.isEnglishLocale
+        ? 'The system loads your saved address first. You can choose another saved address or edit it manually.'
+        : 'ระบบจะดึงข้อมูลที่อยู่ของผู้ใช้มาก่อน และสามารถเลือกใช้ที่อยู่อื่นหรือแก้ไขเองได้'
+    },
+    addressEditLabel () {
+      return this.isEnglishLocale ? 'Edit' : 'แก้ไข'
+    },
+    addressSaveLabel () {
+      return this.isEnglishLocale ? 'Save' : 'บันทึก'
+    },
+    ceremonyStatusSelectLabel () {
+      return this.isEnglishLocale ? 'Select status' : 'เลือกสถานะ'
+    },
+    foodAllergyHelpText () {
+      return this.isEnglishLocale
+        ? 'Please specify food allergies or precautions for meal preparation.'
+        : 'กรุณาระบุอาหารที่แพ้หรือข้อควรระวังสำหรับการจัดอาหาร'
     },
     summarySchool () {
       return this.localizedSchoolName(this.form.school)
@@ -756,7 +1097,7 @@ export default {
       ]
     },
     ceremonyStatusLabel () {
-      const ceremonyStatus = normalizeCode(this.form.ceremonyStatus)
+      const ceremonyStatus = normalizeCeremonyStatus(this.form.ceremonyStatus)
       const selected = CEREMONY_STATUS_OPTIONS.find(item => item.value === ceremonyStatus)
       if (!selected) return '-'
       const selectedLabel = `${selected.value} - ${this.$t(`graduation.ceremonyStatus.${selected.key}`)}`
@@ -783,14 +1124,14 @@ export default {
       return isAssistanceCeremonyStatus(this.form.ceremonyStatus)
     },
     ceremonyAssistanceSelectKey () {
-      return `ceremony-assistance-${normalizeCode(this.form.ceremonyStatus)}`
+      return `ceremony-assistance-${normalizeCeremonyStatus(this.form.ceremonyStatus)}`
     },
     ceremonyStatusRequiresNote () {
-      return CEREMONY_STATUS_REQUIRES_NOTE.includes(normalizeCode(this.form.ceremonyStatus)) ||
+      return CEREMONY_STATUS_REQUIRES_NOTE.includes(normalizeCeremonyStatus(this.form.ceremonyStatus)) ||
         CEREMONY_ASSISTANCE_REQUIRES_NOTE.includes(normalizeCode(this.form.ceremonyAssistanceType))
     },
     requiresCertificateDelivery () {
-      return normalizeCode(this.form.ceremonyStatus) === '3'
+      return ['50', '60'].includes(normalizeCeremonyStatus(this.form.ceremonyStatus))
     },
     requiresCertificateShipping () {
       return this.requiresCertificateDelivery && this.form.certificateDeliveryMethod === 'postal'
@@ -800,15 +1141,6 @@ export default {
         { label: '', value: '' },
         { label: this.$t('graduation.certificate.pickup'), value: 'pickup' },
         { label: this.$t('graduation.certificate.postal'), value: 'postal' }
-      ]
-    },
-    certificateShippingServiceOptions () {
-      return [
-        { label: '', value: '' },
-        ...CERTIFICATE_SHIPPING_SERVICE_OPTIONS.map(item => ({
-          label: `${this.$t(`graduation.certificate.shipping.${item.value}.label`)} (${this.shippingFeeLabel(item.fee)})`,
-          value: item.value
-        }))
       ]
     },
     certificateShippingRates () {
@@ -891,10 +1223,23 @@ export default {
   watch: {
     currentProfile: {
       handler () {
+        this.restoreDraft()
         this.applyProfileDefaults()
+        this.lastRegistrationLookupEmail = ''
         this.fetchRegistrationDefaults()
       },
       deep: true
+    },
+    phoneCountry () {
+      this.syncPhoneFromParts()
+    },
+    phoneLocalNumber (next) {
+      const normalized = normalizePhoneDigits(next)
+      if (next !== normalized) {
+        this.phoneLocalNumber = normalized
+        return
+      }
+      this.syncPhoneFromParts()
     },
     'form.school' (next) {
       const normalizedSchool = schoolKeyFor(next) || optionValue(next)
@@ -910,7 +1255,12 @@ export default {
       }
       this.syncCatalogLanguageFields()
     },
-    'form.ceremonyStatus' () {
+    'form.ceremonyStatus' (next) {
+      const normalized = normalizeCeremonyStatus(next)
+      if (next !== normalized) {
+        this.form.ceremonyStatus = normalized
+        return
+      }
       if (!this.requiresAssistanceType) {
         this.form.ceremonyAssistanceType = ''
       }
@@ -948,6 +1298,82 @@ export default {
     isLockedField (field) {
       return !!(this.lockedFields && this.lockedFields[field])
     },
+    applyFixedGraduateName () {
+      const studentCode = this.authStudentCode || normalizeStudentCode(this.currentRegistrationBarcodeValue)
+      const fixedName = GRADUATE_NAME_OVERRIDES[studentCode]
+      if (!fixedName) return
+      this.form.firstName = fixedName.firstName
+      this.form.lastName = fixedName.lastName
+      this.$set(this.lockedFields, 'firstName', 'profile')
+      this.$set(this.lockedFields, 'lastName', 'profile')
+    },
+    onPronunciationKeydown (field, event) {
+      if (!event || (event.key !== ' ' && event.code !== 'Space')) return
+      event.preventDefault()
+      const input = event.target
+      const current = input && typeof input.value === 'string'
+        ? input.value
+        : String(this.form[field] || '')
+      const start = input && typeof input.selectionStart === 'number' ? input.selectionStart : current.length
+      const end = input && typeof input.selectionEnd === 'number' ? input.selectionEnd : start
+      const nextValue = `${current.slice(0, start)}-${current.slice(end)}`
+      this.form[field] = nextValue
+      this.$nextTick(() => {
+        if (input && input.setSelectionRange) {
+          input.setSelectionRange(start + 1, start + 1)
+        }
+      })
+    },
+    onPhoneCountryInput (value) {
+      const selectedValue = optionValue(value)
+      const selected = PHONE_COUNTRY_OPTIONS.find(item => item.value === selectedValue)
+      this.phoneCountry = selected ? selected.value : 'TH'
+      this.syncPhoneFromParts()
+    },
+    onPhoneNumberKeydown (event) {
+      const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'Escape', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End']
+      if (!event || allowedKeys.includes(event.key) || event.ctrlKey || event.metaKey) return
+      if (!/^\d$/.test(event.key)) {
+        event.preventDefault()
+      }
+    },
+    onPhoneNumberPaste (event) {
+      if (!event || !event.clipboardData) return
+      const pastedDigits = normalizePhoneDigits(event.clipboardData.getData('text'))
+      event.preventDefault()
+      if (!pastedDigits) return
+      const input = event.target
+      const current = String(this.phoneLocalNumber || '')
+      const start = input && typeof input.selectionStart === 'number' ? input.selectionStart : current.length
+      const end = input && typeof input.selectionEnd === 'number' ? input.selectionEnd : start
+      this.phoneLocalNumber = `${current.slice(0, start)}${pastedDigits}${current.slice(end)}`
+      this.$nextTick(() => {
+        if (input && input.setSelectionRange) {
+          const cursor = start + pastedDigits.length
+          input.setSelectionRange(cursor, cursor)
+        }
+      })
+    },
+    syncPhoneFromParts () {
+      this.form.phone = this.composedPhone
+    },
+    syncPhonePartsFromPhone (value) {
+      const raw = String(value == null ? '' : value).trim()
+      const compactRaw = raw.replace(/\s+/g, '')
+      const digits = normalizePhoneDigits(raw)
+      const matchedCountry = PHONE_COUNTRY_OPTIONS.find(country => {
+        const dialDigits = phoneDialDigits(country)
+        return compactRaw.startsWith(country.dialCode) || (digits && digits.startsWith(dialDigits))
+      }) || PHONE_COUNTRY_OPTIONS[0]
+      let localNumber = digits
+      const matchedDialDigits = phoneDialDigits(matchedCountry)
+      if (localNumber.startsWith(matchedDialDigits)) {
+        localNumber = localNumber.slice(matchedDialDigits.length)
+      }
+      this.phoneCountry = matchedCountry.value
+      this.phoneLocalNumber = localNumber
+      this.syncPhoneFromParts()
+    },
     isAddressReadonly (addressKey) {
       return !this.addressEditing[addressKey]
     },
@@ -972,6 +1398,48 @@ export default {
       })
       return normalized
     },
+    addressTitle (addressKey) {
+      const titles = {
+        homeAddress: this.$t('graduation.address.home'),
+        currentAddress: this.$t('graduation.address.current'),
+        workAddress: this.$t('graduation.address.work')
+      }
+      return titles[addressKey] || ''
+    },
+    addressSourceOptions (targetKey) {
+      const sourceOptions = ADDRESS_COPY_SOURCE_KEYS
+        .filter(addressKey => addressKey !== targetKey && this.hasAnyAddressValue(this.form[addressKey]))
+        .map(addressKey => ({
+          value: addressKey,
+          label: this.isEnglishLocale
+            ? `Use ${this.addressTitle(addressKey)}`
+            : `ใช้${this.addressTitle(addressKey)}`
+        }))
+      return [
+        ...sourceOptions
+      ]
+    },
+    onAddressSourceSelect (targetKey, value) {
+      const selected = optionValue(value)
+      if (!selected) return
+      if (selected === 'manual') {
+        if (Object.prototype.hasOwnProperty.call(this.addressEditing, targetKey)) {
+          this.enableAddressEdit(targetKey)
+        }
+        return
+      }
+      this.copyAddressTo(targetKey, selected)
+    },
+    copyAddressTo (targetKey, sourceKey) {
+      if (!targetKey || !sourceKey || targetKey === sourceKey) return
+      const address = this.normalizedAddress(this.form[sourceKey])
+      if (!this.hasAnyAddressValue(address)) return
+      this.$set(this.form, targetKey, Object.assign(emptyAddress(), address))
+      if (Object.prototype.hasOwnProperty.call(this.addressEditing, targetKey)) {
+        this.$set(this.addressEditing, targetKey, false)
+      }
+      this.persistLocalDraft()
+    },
     applyAddressDefaults (registration) {
       const addressKeys = ['homeAddress', 'currentAddress', 'workAddress']
       addressKeys.forEach(addressKey => {
@@ -982,10 +1450,21 @@ export default {
         this.$set(this.addressEditing, addressKey, false)
       })
     },
+    applyProfileAddressDefaults () {
+      const defaults = profileAddressDefaults(this.currentProfile)
+      ADDRESS_SOURCE_KEYS.forEach(addressKey => {
+        const address = this.normalizedAddress(defaults[addressKey])
+        if (!this.hasAnyAddressValue(address) || this.hasAnyAddressValue(this.form[addressKey])) return
+        this.$set(this.form, addressKey, address)
+        this.$set(this.addressEditing, addressKey, false)
+      })
+    },
     registrationSearchTerms () {
+      const studentCode = this.authStudentCode || normalizeStudentCode(this.currentRegistrationBarcodeValue)
+      if (studentCode) return [studentCode]
+      const email = this.authEmail || normalizeEmailText(this.form.email)
+      if (email) return [email]
       return [
-        this.form.email,
-        this.currentProfile && this.currentProfile.email,
         this.form.phone,
         this.form.barcodeValue,
         this.form.firstName,
@@ -995,12 +1474,14 @@ export default {
         .filter((item, index, list) => item && list.indexOf(item) === index)
     },
     registrationMatchScore (registration) {
-      const email = textValue(this.form.email || (this.currentProfile && this.currentProfile.email)).toLowerCase()
+      const studentCode = this.authStudentCode || normalizeStudentCode(this.currentRegistrationBarcodeValue)
+      const email = this.authEmail || normalizeEmailText(this.form.email)
       const phone = textValue(this.form.phone)
       const firstName = textValue(this.form.firstName)
       const lastName = textValue(this.form.lastName)
       let score = 0
-      if (email && textValue(registration.email).toLowerCase() === email) score += 100
+      if (studentCode) return normalizeStudentCode(registration && registration.barcodeValue) === studentCode ? 120 : 0
+      if (email) return normalizeEmailText(registration.email) === email ? 100 : 0
       if (phone && textValue(registration.phone) === phone) score += 80
       if (firstName && textValue(registration.firstName) === firstName) score += 30
       if (lastName && textValue(registration.lastName) === lastName) score += 30
@@ -1076,10 +1557,14 @@ export default {
         programEnglish: textValue(registration && registration.programEnglish)
       }, { source: 'registration' })
       this.applyAddressDefaults(registration)
+      this.applyFixedGraduateName()
     },
     applyDefaults (defaults, options = {}) {
       const source = options.source || 'profile'
       ;['firstName', 'lastName', 'phone', 'email'].forEach(field => {
+        if (['firstName', 'lastName'].includes(field) && source !== 'profile' && this.lockedFields[field] === 'profile') {
+          return
+        }
         if (defaults[field]) {
           this.form[field] = defaults[field]
           this.$set(this.lockedFields, field, source)
@@ -1088,6 +1573,7 @@ export default {
           this.$delete(this.lockedFields, field)
         }
       })
+      this.syncPhonePartsFromPhone(this.form.phone)
       if (defaults.school) {
         this.form.school = defaults.school
         this.form.schoolEnglish = defaults.schoolEnglish || ''
@@ -1110,24 +1596,33 @@ export default {
     applyProfileDefaults () {
       const defaults = profileRegistrationDefaults(this.currentProfile)
       this.applyDefaults(defaults, { source: 'profile' })
+      this.applyProfileAddressDefaults()
+      this.applyFixedGraduateName()
     },
     async fetchRegistrationDefaults () {
+      const studentCode = this.authStudentCode || normalizeStudentCode(this.currentRegistrationBarcodeValue)
+      const authEmail = this.authEmail || normalizeEmailText(this.form.email)
       const searchTerms = this.registrationSearchTerms()
-      const lookupKey = searchTerms.join('|') || 'auth-account'
+      const lookupKey = studentCode || authEmail || searchTerms.join('|') || 'auth-account'
       if (this.lastRegistrationLookupEmail === lookupKey) return
       this.lastRegistrationLookupEmail = lookupKey
       try {
-        const defaultResponse = await api.graduateRegistrations('defaults', {
-          email: this.form.email || (this.currentProfile && this.currentProfile.email),
-          phone: this.form.phone,
-          firstName: this.form.firstName,
-          lastName: this.form.lastName
-        })
+        const defaultResponse = await api.graduateRegistrations('defaults', studentCode
+          ? { studentCode, barcodeValue: studentCode }
+          : authEmail
+          ? { email: authEmail }
+          : {
+              phone: this.form.phone,
+              firstName: this.form.firstName,
+              lastName: this.form.lastName
+            })
         const defaultRow = defaultResponse && defaultResponse.data ? defaultResponse.data.data : null
         if (defaultRow) {
           this.applyRegistrationDefaults(defaultRow)
           return
         }
+        if (studentCode) return
+        if (authEmail) return
         if (!searchTerms.length) return
         const responses = await Promise.all(searchTerms.map(term => (
           api.graduateRegistrations('list', { q: term, limit: 20 })
@@ -1166,7 +1661,7 @@ export default {
       this.form.programEnglish = textValue(programItem && (programItem.programEnglish || programItem.labelEn))
     },
     onCeremonyStatusInput (value) {
-      const ceremonyStatus = normalizeCode(value)
+      const ceremonyStatus = normalizeCeremonyStatus(value)
       if (this.form.ceremonyStatus !== ceremonyStatus) {
         this.form.ceremonyStatus = ceremonyStatus
       }
@@ -1195,6 +1690,9 @@ export default {
         this.form.certificateShippingService = ''
         this.form.certificateDeliveryAddress = emptyAddress()
       }
+    },
+    selectCertificateShippingService (value) {
+      this.form.certificateShippingService = optionValue(value)
     },
     clearCertificateDelivery () {
       this.form.certificateDeliveryMethod = ''
@@ -1254,18 +1752,21 @@ export default {
       return true
     },
     registrationPayload () {
+      this.syncPhoneFromParts()
       const hasFoodAllergy = normalizeYesNo(this.form.hasFoodAllergy)
       const schoolItem = this.findCatalogSchool(this.form.school)
       const programItem = this.findCatalogProgram(this.form.school, this.form.program)
       return Object.assign({}, this.form, {
         namePronunciation: this.namePronunciation,
+        phone: this.composedPhone,
+        email: this.authEmail || normalizeEmailText(this.form.email),
         school: textValue(this.form.school),
         schoolEnglish: textValue(schoolItem && (schoolItem.schoolEnglish || schoolItem.labelEn)) || textValue(this.form.schoolEnglish),
         program: textValue(this.form.program),
         programEnglish: textValue(programItem && (programItem.programEnglish || programItem.labelEn)) || textValue(this.form.programEnglish),
         hasFoodAllergy,
         foodAllergyNote: hasFoodAllergy === 'yes' ? this.form.foodAllergyNote : '',
-        barcodeValue: this.currentRegistrationBarcodeValue || this.barcodeValue
+        barcodeValue: this.currentRegistrationBarcodeValue || this.authStudentCode || this.barcodeValue
       })
     },
     persistLocalDraft (savedRegistration) {
@@ -1274,11 +1775,13 @@ export default {
         : this.currentRegistrationId
       const savedBarcode = savedRegistration && savedRegistration.barcodeValue
         ? textValue(savedRegistration.barcodeValue)
-        : (this.currentRegistrationBarcodeValue || this.barcodeValue)
+        : (this.currentRegistrationBarcodeValue || this.authStudentCode || this.barcodeValue)
       this.currentRegistrationId = savedId
       this.currentRegistrationBarcodeValue = savedBarcode
       const payload = {
         form: Object.assign({}, this.form, {
+          phone: this.composedPhone,
+          email: this.authEmail || normalizeEmailText(this.form.email),
           school: textValue(this.form.school),
           program: textValue(this.form.program)
         }),
@@ -1286,7 +1789,7 @@ export default {
         currentRegistrationId: savedId,
         savedAt: new Date().toISOString()
       }
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+      window.localStorage.setItem(this.draftStorageKey, JSON.stringify(payload))
     },
     async saveDraft () {
       if (!this.validateForm()) {
@@ -1316,9 +1819,19 @@ export default {
       }
     },
     restoreDraft () {
+      const storageKey = this.draftStorageKey
+      if (this.loadedDraftStorageKey === storageKey) return
+      this.loadedDraftStorageKey = storageKey
       try {
-        const raw = window.localStorage.getItem(STORAGE_KEY)
-        if (!raw) return
+        const raw = window.localStorage.getItem(storageKey)
+        if (!raw) {
+          this.form = cloneForm()
+          this.syncPhonePartsFromPhone('')
+          this.applyFixedGraduateName()
+          this.currentRegistrationId = ''
+          this.currentRegistrationBarcodeValue = ''
+          return
+        }
         const payload = JSON.parse(raw)
         const restored = Object.assign(cloneForm(), payload.form || {})
         this.currentRegistrationId = textValue(payload.currentRegistrationId)
@@ -1336,15 +1849,17 @@ export default {
         restored.schoolEnglish = textValue(restored.schoolEnglish)
         restored.program = textValue(restored.program)
         restored.programEnglish = textValue(restored.programEnglish)
-        const restoredCeremonyStatus = normalizeCode(restored.ceremonyStatus)
-        if (CEREMONY_ASSISTANCE_TYPE_OPTIONS.some(item => item.value === restoredCeremonyStatus)) {
-          restored.ceremonyAssistanceType = restoredCeremonyStatus
+        const restoredCeremonyRaw = normalizeCode(restored.ceremonyStatus)
+        if (CEREMONY_ASSISTANCE_TYPE_OPTIONS.some(item => item.value === restoredCeremonyRaw)) {
+          restored.ceremonyAssistanceType = restoredCeremonyRaw
           restored.ceremonyStatus = '20'
+        } else {
+          restored.ceremonyStatus = normalizeCeremonyStatus(restoredCeremonyRaw)
         }
         if (!isAssistanceCeremonyStatus(restored.ceremonyStatus)) {
           restored.ceremonyAssistanceType = ''
         }
-        if (normalizeCode(restored.ceremonyStatus) !== '3') {
+        if (!['50', '60'].includes(normalizeCeremonyStatus(restored.ceremonyStatus))) {
           restored.certificateDeliveryMethod = ''
           restored.certificateShippingService = ''
           restored.certificateDeliveryAddress = emptyAddress()
@@ -1356,8 +1871,12 @@ export default {
           restored.foodAllergyNote = ''
         }
         this.form = restored
+        this.syncPhonePartsFromPhone(this.form.phone)
+        this.applyFixedGraduateName()
       } catch (error) {
         this.form = cloneForm()
+        this.syncPhonePartsFromPhone('')
+        this.applyFixedGraduateName()
         this.currentRegistrationId = ''
         this.currentRegistrationBarcodeValue = ''
       }
@@ -1367,12 +1886,15 @@ export default {
         return
       }
       this.form = cloneForm()
+      this.syncPhonePartsFromPhone('')
+      this.applyFixedGraduateName()
       this.currentRegistrationId = ''
       this.currentRegistrationBarcodeValue = ''
       this.resetAddressEditing()
       this.foodAllergyAlertShown = false
       this.validationAttempted = false
       if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.removeItem(this.draftStorageKey)
         window.localStorage.removeItem(STORAGE_KEY)
       }
       notifySuccess(this.$store, this.$t('graduation.messages.clearSuccess'))
@@ -1419,8 +1941,7 @@ export default {
   font-weight: 700;
   text-transform: uppercase;
 }
-.registration-header__actions,
-.registration-bottom-actions {
+.registration-header__actions {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
@@ -1432,10 +1953,6 @@ export default {
 }
 .registration-header__actions .btn {
   white-space: nowrap;
-}
-.registration-bottom-actions {
-  justify-content: flex-end;
-  margin-top: 8px;
 }
 .registration-card {
   border: 1px solid #e5e7eb;
@@ -1466,6 +1983,59 @@ export default {
   color: #4b5563;
   font-size: 13px;
 }
+.required-mark {
+  margin-left: 4px;
+  color: #e55353;
+  font-weight: 900;
+}
+.required-field ::v-deep label::after {
+  content: " *";
+  color: #e55353;
+  font-weight: 900;
+}
+.phone-field {
+  margin-bottom: 1rem;
+}
+.phone-field__label {
+  display: inline-block;
+  margin-bottom: 0.5rem;
+  color: #3c4b64;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.phone-field__control {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.2fr) 74px minmax(0, 1.4fr);
+  gap: 8px;
+  align-items: start;
+}
+.phone-field__control .form-group {
+  margin-bottom: 0;
+}
+.phone-country-select,
+.phone-local-input {
+  min-width: 0;
+  margin-bottom: 0;
+}
+.phone-dial-code {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(1.5em + 0.75rem + 2px);
+  padding: 0.375rem 0.5rem;
+  border: 1px solid #d8dbe0;
+  border-radius: 0.25rem;
+  color: #3c4b64;
+  background: #fff;
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.phone-field.is-invalid .phone-dial-code,
+.phone-field.is-invalid .custom-select,
+.phone-field.is-invalid .form-control {
+  border-color: #e55353;
+}
 .section-heading {
   display: flex;
   justify-content: space-between;
@@ -1476,49 +2046,119 @@ export default {
 .section-heading h2 {
   margin: 0;
   color: #1f2937;
-  font-size: 18px;
+  font-size: 20px;
+  font-weight: 800;
+}
+.ceremony-status-select ::v-deep label {
+  color: #374151;
+  font-size: 14px;
   font-weight: 700;
 }
-.address-section-card {
-  border-left: 4px solid #8c1515;
+.ceremony-section-heading {
+  margin-bottom: 18px;
+}
+.ceremony-section-heading h2 {
+  font-size: 20px;
+  font-weight: 800;
+}
+.address-group-heading {
+  margin: 0 0 22px;
+  padding-right: 44px;
+}
+.address-group-heading h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 20px;
+  font-weight: 800;
+}
+.address-group-heading p {
+  margin: 6px 0 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+.address-group-card {
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+}
+.address-panel {
+  padding-top: 20px;
+  border-top: 1px solid #eef2f7;
+}
+.address-group-heading + .address-panel {
+  padding-top: 0;
+  border-top: 0;
+}
+.address-panel + .address-panel {
+  margin-top: 26px;
 }
 .address-block {
   position: relative;
+}
+.address-block.readonly-white .form-control {
+  color: #111827;
+  background-color: #e5e7eb;
+  border-color: #d1d5db;
+  pointer-events: none;
+}
+.address-block ::v-deep .form-group > label {
+  color: #111827;
+  font-size: 15px;
+  font-weight: 500;
 }
 .address-subsection {
   display: flex;
   align-items: center;
   gap: 10px;
   min-height: 34px;
-  padding-right: 44px;
-  margin-bottom: 18px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #eef2f7;
+  padding-right: 58px;
+  margin-bottom: 10px;
   color: #111827;
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.25;
 }
 .address-subsection::before {
-  content: "";
-  width: 10px;
-  height: 10px;
-  flex: 0 0 auto;
-  border-radius: 999px;
-  background: #8c1515;
+  display: none;
 }
 .address-subsection span {
   flex: 1 1 auto;
 }
+.address-choice-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 58px 18px 0;
+}
+.address-choice-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding-right: 14px;
+  padding-left: 14px;
+  border-color: #6b5b95;
+  color: #3f3675;
+  background: #fff;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.address-choice-button:hover,
+.address-choice-button:focus {
+  border-color: #8c1515;
+  color: #fff;
+  background: #8c1515;
+}
 .address-icon-button {
   position: absolute;
-  top: 0;
+  top: 2px;
   right: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 42px;
+  height: 42px;
   padding: 0;
+  border-radius: 8px;
 }
 .address-save-row {
   display: flex;
@@ -1527,6 +2167,85 @@ export default {
 }
 .address-save-button {
   white-space: nowrap;
+}
+.address-group-card ::v-deep .address-block {
+  position: relative;
+}
+.address-group-card ::v-deep .address-subsection {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 42px;
+  margin-bottom: 12px;
+  color: #111827;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.address-group-card ::v-deep .address-subsection span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.address-group-card ::v-deep .address-icon-button {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 8px;
+}
+.address-group-card ::v-deep .address-choice-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 16px;
+  margin: 4px 0 24px;
+}
+.address-group-card ::v-deep .address-choice-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 16px;
+  border-color: #6b5b95;
+  border-radius: 6px;
+  color: #3f3675;
+  background: #fff;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.address-group-card ::v-deep .address-choice-button:hover,
+.address-group-card ::v-deep .address-choice-button:focus {
+  border-color: #8c1515;
+  color: #fff;
+  background: #8c1515;
+}
+.address-group-card ::v-deep .address-grid {
+  row-gap: 6px;
+}
+.address-group-card ::v-deep .address-grid .form-group {
+  margin-bottom: 22px;
+}
+.address-group-card ::v-deep .address-grid .form-group > label {
+  margin-bottom: 8px;
+  color: #111827;
+  font-size: 16px;
+  font-weight: 500;
+}
+.address-group-card ::v-deep .address-grid .form-control {
+  min-height: 46px;
+  border: 1px solid #d8dbe0;
+  border-radius: 6px;
+  color: #111827;
+  font-size: 16px;
+}
+.address-group-card ::v-deep .address-block.readonly-white .address-grid .form-control {
+  background-color: #e5e7eb;
+  border-color: #d1d5db;
+  pointer-events: none;
 }
 .certificate-delivery-block {
   margin: 8px 0 18px;
@@ -1539,8 +2258,67 @@ export default {
 .certificate-delivery-title {
   margin-bottom: 12px;
   color: #111827;
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 800;
+}
+.certificate-delivery-address {
+  margin-top: 16px;
+}
+.certificate-delivery-address ::v-deep .address-subsection {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 40px;
+  margin-bottom: 12px;
+  color: #111827;
+  font-size: 21px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.certificate-delivery-address ::v-deep .address-choice-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 16px;
+  margin: 4px 0 24px;
+}
+.certificate-delivery-address ::v-deep .address-choice-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 16px;
+  border-color: #6b5b95;
+  border-radius: 6px;
+  color: #3f3675;
+  background: #fff;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.certificate-delivery-address ::v-deep .address-choice-button:hover,
+.certificate-delivery-address ::v-deep .address-choice-button:focus {
+  border-color: #8c1515;
+  color: #fff;
+  background: #8c1515;
+}
+.certificate-delivery-address ::v-deep .address-grid {
+  row-gap: 6px;
+}
+.certificate-delivery-address ::v-deep .address-grid .form-group {
+  margin-bottom: 18px;
+}
+.certificate-delivery-address ::v-deep .address-grid .form-group > label {
+  margin-bottom: 8px;
+  color: #111827;
+  font-size: 16px;
+  font-weight: 500;
+}
+.certificate-delivery-address ::v-deep .address-grid .form-control {
+  min-height: 46px;
+  border: 1px solid #d8dbe0;
+  border-radius: 6px;
+  color: #111827;
+  font-size: 16px;
 }
 .shipping-rate-grid {
   display: grid;
@@ -1548,13 +2326,59 @@ export default {
   gap: 10px;
   margin: 4px 0 18px;
 }
+.shipping-service-label {
+  margin-bottom: 8px;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 600;
+}
+.shipping-service-picker.is-invalid .shipping-rate-card {
+  border-color: #e55353;
+}
 .shipping-rate-card {
+  position: relative;
   display: grid;
   gap: 4px;
-  padding: 12px;
+  width: 100%;
+  min-height: 116px;
+  padding: 14px 44px 14px 14px;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   background: #fff;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease, background-color 0.15s ease;
+}
+.shipping-rate-card:hover,
+.shipping-rate-card:focus {
+  border-color: #8c1515;
+  box-shadow: 0 8px 18px rgba(140, 21, 21, 0.12);
+  outline: none;
+}
+.shipping-rate-card--selected {
+  border-color: #8c1515;
+  background: #fff8f8;
+  box-shadow: 0 0 0 2px rgba(140, 21, 21, 0.12);
+}
+.shipping-rate-card__check {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  color: #fff;
+  background: #fff;
+}
+.shipping-rate-card--selected .shipping-rate-card__check {
+  border-color: #8c1515;
+  background: #8c1515;
 }
 .shipping-rate-card strong {
   color: #111827;
@@ -1572,14 +2396,56 @@ export default {
   position: sticky;
   top: 84px;
 }
+.summary-card {
+  overflow: hidden;
+  border-color: #dde3ee;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.12);
+}
+.summary-card::before {
+  display: block;
+  height: 4px;
+  margin: -1.25rem -1.25rem 18px;
+  background: linear-gradient(90deg, #8c1515, #c9a227);
+  content: "";
+}
+.summary-heading {
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+.summary-heading > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.summary-heading h2 {
+  font-size: 20px;
+}
+.summary-heading__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  color: #8c1515;
+  background: #fff1f1;
+}
+.summary-badge {
+  flex: 0 0 auto;
+  margin-top: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+}
 .summary-list {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 .summary-list div {
   display: grid;
-  gap: 2px;
-  padding-bottom: 10px;
+  gap: 4px;
+  padding: 11px 0;
   border-bottom: 1px solid #eef2f7;
 }
 .summary-list span {
@@ -1589,30 +2455,75 @@ export default {
 .summary-list strong {
   color: #111827;
   overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+.summary-progress-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+  color: #6b7280;
+  font-size: 12px;
+}
+.summary-progress-label span {
+  color: #8c1515;
+  font-size: 14px;
+  font-weight: 800;
+}
+.summary-progress-label em {
+  font-style: normal;
+  font-weight: 700;
 }
 .completion-meter {
-  height: 8px;
+  height: 10px;
   overflow: hidden;
-  margin-top: 18px;
+  margin-top: 8px;
   border-radius: 999px;
   background: #e5e7eb;
 }
 .completion-meter span {
   display: block;
   height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #8c1515, #c9a227);
+}
+.summary-actions {
+  display: flex;
+  margin-top: 20px;
+}
+.summary-save-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 46px;
+  border: 0;
+  border-radius: 8px;
   background: #8c1515;
+  box-shadow: 0 10px 22px rgba(140, 21, 21, 0.24);
+  font-weight: 800;
+  white-space: nowrap;
+}
+.summary-save-button:hover,
+.summary-save-button:focus {
+  background: #751111;
+  box-shadow: 0 12px 26px rgba(140, 21, 21, 0.3);
 }
 @media (max-width: 768px) {
   .registration-header,
-  .registration-header__actions,
-  .registration-bottom-actions {
+  .registration-header__actions {
     flex-direction: column;
-  }
-  .registration-bottom-actions .btn {
-    width: 100%;
   }
   .shipping-rate-grid {
     grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 575px) {
+  .phone-field__control {
+    grid-template-columns: 1fr 74px;
+  }
+  .phone-local-input {
+    grid-column: 1 / -1;
   }
 }
 </style>

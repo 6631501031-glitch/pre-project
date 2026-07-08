@@ -92,11 +92,44 @@ function emptyForm () {
     firstName: '',
     lastName: '',
     phone: '',
+    email: '',
     school: '',
     schoolEnglish: '',
     program: '',
     programEnglish: ''
   }
+}
+
+function textValue (value) {
+  if (value && typeof value === 'object') {
+    if (value.value !== undefined) return textValue(value.value)
+    if (value.label !== undefined) return textValue(value.label)
+    if (value.name !== undefined) return textValue(value.name)
+    if (value.title !== undefined) return textValue(value.title)
+  }
+  const text = String(value == null ? '' : value).trim()
+  return text && text !== '-' && text !== '[object Object]' ? text : ''
+}
+
+function normalizeEmailText (value) {
+  const email = textValue(value).toLowerCase()
+  return email && email.indexOf('@') !== -1 ? email : ''
+}
+
+function profileEmail (profile) {
+  const source = profile && typeof profile === 'object' ? profile : {}
+  const userinfo = source.userinfo && typeof source.userinfo === 'object' ? source.userinfo : {}
+  const authen = Array.isArray(source.authen) ? source.authen : []
+  const candidates = [source.email, userinfo.email, source.username]
+  authen.forEach(item => {
+    candidates.push(item && item.email)
+    candidates.push(item && item.username)
+  })
+  for (let index = 0; index < candidates.length; index += 1) {
+    const email = normalizeEmailText(candidates[index])
+    if (email) return email
+  }
+  return ''
 }
 
 export default {
@@ -109,10 +142,22 @@ export default {
       cameraActive: false,
       cameraLoading: false,
       cameraError: '',
-      cameraStream: null
+      cameraStream: null,
+      loadedDraftStorageKey: ''
     }
   },
   computed: {
+    currentProfile () {
+      return this.$store && this.$store.getters ? this.$store.getters['auth/profile'] : null
+    },
+    authEmail () {
+      return profileEmail(this.currentProfile)
+    },
+    draftStorageKey () {
+      const profile = this.currentProfile || {}
+      const identity = this.authEmail || textValue(profile._id || profile.id || profile.code || profile.username).toLowerCase() || 'anonymous'
+      return `${STORAGE_KEY}:${encodeURIComponent(identity)}`
+    },
     fullName () {
       return [this.form.firstName, this.form.lastName].filter(Boolean).join(' ')
     },
@@ -139,11 +184,20 @@ export default {
   beforeDestroy () {
     this.stopCamera()
   },
+  watch: {
+    currentProfile () {
+      this.restoreDraft()
+    }
+  },
   methods: {
     restoreDraft () {
+      const storageKey = this.draftStorageKey
+      if (this.loadedDraftStorageKey === storageKey) return
+      this.loadedDraftStorageKey = storageKey
       try {
-        const payload = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '{}')
+        const payload = JSON.parse(window.localStorage.getItem(storageKey) || '{}')
         this.form = Object.assign(emptyForm(), payload.form || {})
+        this.form.email = this.authEmail || normalizeEmailText(this.form.email)
         this.registrationId = payload.currentRegistrationId || ''
         this.photoPreview = payload.photoPreview || ''
       } catch (error) {
@@ -153,16 +207,18 @@ export default {
     persistPhoto () {
       let payload = {}
       try {
-        payload = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '{}')
+        payload = JSON.parse(window.localStorage.getItem(this.draftStorageKey) || '{}')
       } catch (error) {
         payload = {}
       }
-      payload.form = Object.assign({}, payload.form || {}, this.form)
+      payload.form = Object.assign({}, payload.form || {}, this.form, {
+        email: this.authEmail || normalizeEmailText(this.form.email)
+      })
       payload.currentRegistrationId = this.registrationId || payload.currentRegistrationId || ''
       payload.photoPreview = this.photoPreview
       payload.barcodeValue = this.barcodeValue
       payload.savedAt = new Date().toISOString()
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+      window.localStorage.setItem(this.draftStorageKey, JSON.stringify(payload))
       return payload
     },
     async startCamera () {
@@ -228,6 +284,7 @@ export default {
       if (!this.registrationId || !this.photoPreview) return
       const formPayload = Object.assign({}, draftPayload && draftPayload.form ? draftPayload.form : this.form, {
         _id: this.registrationId,
+        email: this.authEmail || normalizeEmailText(this.form.email),
         barcodeValue: this.barcodeValue,
         facePhoto: this.photoPreview
       })

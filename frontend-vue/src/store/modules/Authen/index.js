@@ -11,6 +11,33 @@ const X_ACCESS_TOKEN_STORAGE_KEY = 'x-access-token';
 const POST_SIGNIN_ROUTE = '/dashboard';
 const APP_AUTH_SYSTEM = process.env.VUE_APP_AUTH_SYSTEM || process.env.VUE_APP_PROJECT_APP_ID || 'graduationsystemusingfacerecognition';
 
+function normalizeStudentCode(value) {
+    return String(value || '').replace(/\D/g, '').trim();
+}
+
+function studentCodeFromPayload(payload) {
+    if (!payload || typeof payload !== 'object') return '';
+    return normalizeStudentCode(payload.studentCode || payload.barcodeValue || payload.username);
+}
+
+function withStudentCodeProfile(profile, studentCode) {
+    const normalizedStudentCode = normalizeStudentCode(studentCode);
+    if (!normalizedStudentCode || !profile || typeof profile !== 'object') return profile;
+    return Object.assign({}, profile, {
+        studentCode: normalizedStudentCode,
+        barcodeValue: profile.barcodeValue || normalizedStudentCode
+    });
+}
+
+function storedSessionPayload(token, studentCode) {
+    const payload = { xAccessToken: token };
+    const normalizedStudentCode = normalizeStudentCode(studentCode);
+    if (normalizedStudentCode) {
+        payload.studentCode = normalizedStudentCode;
+    }
+    return payload;
+}
+
 async function resolvePostSignInRoute(fallback = POST_SIGNIN_ROUTE) {
     const getters = store && store.getters ? store.getters : {};
     try {
@@ -90,6 +117,7 @@ const ServerModule = {
             isOAuth: false,
         },
         pendingToken: '',
+        pendingStudentCode: '',
         isSignIn: true,
         is2FA: false,
         profile: null,
@@ -119,6 +147,9 @@ const ServerModule = {
         },
         pendingToken(state, value) {
             state.pendingToken = value ? String(value) : '';
+        },
+        pendingStudentCode(state, value) {
+            state.pendingStudentCode = normalizeStudentCode(value);
         }
 
     },
@@ -134,11 +165,14 @@ const ServerModule = {
 
             let tokenFromDb = '';
             let tokenFromLocal = '';
+            let storedStudentCode = '';
             try {
                 const stored = await getItem('objs');
                 tokenFromDb = stored && stored.xAccessToken ? String(stored.xAccessToken).trim() : '';
+                storedStudentCode = studentCodeFromPayload(stored);
             } catch (err) {
                 tokenFromDb = '';
+                storedStudentCode = '';
             }
             tokenFromLocal = getTokenFromLocalStorage();
 
@@ -158,14 +192,15 @@ const ServerModule = {
                     if (resolvedToken) {
                         store.commit('set', ['XAccessToken', resolvedToken]);
                         setTokenToLocalStorage(resolvedToken);
-                        await setItem('objs', { xAccessToken: resolvedToken });
+                        await setItem('objs', storedSessionPayload(resolvedToken, storedStudentCode));
                     }
                     setSessionHint(true);
-                    commit('profile', me);
+                    commit('profile', withStudentCodeProfile(me, storedStudentCode));
                     commit('authenticated', { isAuthen: true, isOAuth: true });
                     commit('isSignIn', false);
                     commit('is2FA', false);
                     commit('pendingToken', '');
+                    commit('pendingStudentCode', '');
                     return;
                 } catch (err) {
                     try {
@@ -183,6 +218,7 @@ const ServerModule = {
             commit('profile', null);
             commit('isSignIn', true);
             commit('is2FA', false);
+            commit('pendingStudentCode', '');
         },
         message(_, data) {
 
@@ -230,6 +266,7 @@ const ServerModule = {
             store.commit("dialog/loading", true);
             try {
                 const payload = withAuthSystem(data || {});
+                const studentCode = studentCodeFromPayload(payload);
                 payload.deviceId = getOrCreateDeviceId();
 
                 const response = await Service.authenticated('signin', payload, {});
@@ -248,9 +285,10 @@ const ServerModule = {
                 commit('profile', null);
                 commit('isSignIn', false);
                 commit('is2FA', require2FA);
+                commit('pendingStudentCode', studentCode);
 
                 if (!require2FA) {
-                    await setItem('objs', { xAccessToken: token });
+                    await setItem('objs', storedSessionPayload(token, studentCode));
                     setSessionHint(true);
                     const meRes = await Service.authenticated('me', {}, {});
                     const me = getPayload(meRes);
@@ -260,13 +298,14 @@ const ServerModule = {
                         store.commit('security/reset');
                         store.commit('set', ['XAccessToken', resolvedToken]);
                         setTokenToLocalStorage(resolvedToken);
-                        await setItem('objs', { xAccessToken: resolvedToken });
+                        await setItem('objs', storedSessionPayload(resolvedToken, studentCode));
                     }
-                    commit('profile', me);
+                    commit('profile', withStudentCodeProfile(me, studentCode));
                     commit('authenticated', { isAuthen: true, isOAuth: true });
                     commit('isSignIn', false);
                     commit('is2FA', false);
                     commit('pendingToken', '');
+                    commit('pendingStudentCode', '');
                     await pushPostSignInRoute();
                     return;
                 }
@@ -288,6 +327,7 @@ const ServerModule = {
                     commit('profile', null);
                     commit('isSignIn', true);
                     commit('is2FA', false);
+                    commit('pendingStudentCode', '');
                     store.commit('dialog/showError', {
                         title: "Authentication Error",
                         message: "Unable to send verification code. Please try again.",
@@ -328,7 +368,8 @@ const ServerModule = {
             if (!state.pendingToken) {
                 throw new Error('missing_pending_token');
             }
-            await setItem('objs', { xAccessToken: state.pendingToken });
+            const studentCode = normalizeStudentCode(state.pendingStudentCode);
+            await setItem('objs', storedSessionPayload(state.pendingToken, studentCode));
             setTokenToLocalStorage(state.pendingToken);
             setSessionHint(true);
             const meRes = await Service.authenticated('me', {}, {});
@@ -339,14 +380,15 @@ const ServerModule = {
                 store.commit('security/reset');
                 store.commit('set', ['XAccessToken', resolvedToken]);
                 setTokenToLocalStorage(resolvedToken);
-                await setItem('objs', { xAccessToken: resolvedToken });
+                await setItem('objs', storedSessionPayload(resolvedToken, studentCode));
             }
 
-            commit('profile', me);
+            commit('profile', withStudentCodeProfile(me, studentCode));
             commit('authenticated', { isAuthen: true, isOAuth: true });
             commit('isSignIn', false);
             commit('is2FA', false);
             commit('pendingToken', '');
+            commit('pendingStudentCode', '');
             try {
                 await Service.authenticated('trust-device', withAuthSystem({ deviceId: getOrCreateDeviceId() }), {});
             } catch (err) {
@@ -392,6 +434,7 @@ const ServerModule = {
             commit('isSignIn', true);
             commit('is2FA', false);
             commit('pendingToken', '');
+            commit('pendingStudentCode', '');
             store.commit('security/reset')
             if (router && typeof router.push === 'function') {
                 router.push('/pages/login');

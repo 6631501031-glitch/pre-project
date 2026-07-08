@@ -141,6 +141,18 @@
           <span>{{ $t('graduation.admin.details.extraDetail') }}</span>
           <strong>{{ selectedRegistration.ceremonyStatusNote || '-' }}</strong>
         </div>
+        <div>
+          <span>{{ $t('graduation.address.home') }}</span>
+          <strong>{{ addressLabel(selectedRegistration.homeAddress) }}</strong>
+        </div>
+        <div>
+          <span>{{ $t('graduation.address.current') }}</span>
+          <strong>{{ addressLabel(selectedRegistration.currentAddress) }}</strong>
+        </div>
+        <div>
+          <span>{{ $t('graduation.address.work') }}</span>
+          <strong>{{ addressLabel(selectedRegistration.workAddress) }}</strong>
+        </div>
         <div v-if="cleanStatusCode(selectedRegistration.ceremonyStatus) === '3'">
           <span>{{ $t('graduation.admin.details.certificateMethod') }}</span>
           <strong>{{ certificateDeliveryMethodLabel(selectedRegistration.certificateDeliveryMethod) }}</strong>

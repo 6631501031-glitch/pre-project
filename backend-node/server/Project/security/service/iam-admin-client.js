@@ -1,10 +1,17 @@
 'use strict';
 
 const axios = require('axios');
+const crypto = require('crypto');
 const config = require('../../../../config/config');
 const AccountModel = require('../../accounts/controller/account');
+const GraduateRegistration = require('../../graduationsystemusingfacerecognition/models/graduate_registration.model');
 const { createGRADUATIONSYSTEMUSINGFACERECOGNITIONGRADUATIONSYSTEMUSINGFACERECOGNITIONSdk } = require('../../../integrations/iam/sdk');
 const USER_API_BASE_PATH = '/api/v1';
+
+function createToken() {
+  const length = Number(config.tokenLength || process.env.TOKENLANGTH || 32);
+  return crypto.randomBytes(Number.isFinite(length) && length > 0 ? length : 32).toString('hex');
+}
 
 function getAdminConfig() {
   return config.iamAdmin || {};
@@ -77,6 +84,213 @@ function normalizeLooseKey(value) {
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '');
+}
+
+function textValue(value) {
+  if (Array.isArray(value)) {
+    const found = value.find(function (item) {
+      return item && item.value;
+    });
+    return found ? textValue(found.value) : '';
+  }
+  if (value && typeof value === 'object') {
+    if (value.target && value.target.value !== undefined) return textValue(value.target.value);
+    if (value.value !== undefined) return textValue(value.value);
+    if (value.label !== undefined) return textValue(value.label);
+    if (value.name !== undefined) return textValue(value.name);
+  }
+  const normalized = String(value || '').trim();
+  return normalized && normalized !== '[object Object]' ? normalized : '';
+}
+
+function normalizeStudentCode(value) {
+  const raw = textValue(value);
+  if (!raw || raw.indexOf('@') !== -1) return '';
+  const digits = raw.replace(/\D/g, '');
+  return digits && digits.length >= 4 ? digits : '';
+}
+
+function isStudentCodeSignin(body) {
+  if (!body || typeof body !== 'object') return false;
+  if (String(body.loginMethod || '').trim().toLowerCase() === 'student-code') return true;
+  return !!(body.username && body.password === '********' && normalizeStudentCode(body.username));
+}
+
+function accountEmail(account) {
+  if (!account || typeof account !== 'object') return '';
+  const directEmail = textValue(account.email).toLowerCase();
+  if (directEmail && directEmail.indexOf('@') !== -1) return directEmail;
+  const authen = Array.isArray(account.authen) ? account.authen : [];
+  const authenEmail = authen.find(function (item) {
+    return item && textValue(item.email).indexOf('@') !== -1;
+  });
+  return authenEmail ? textValue(authenEmail.email).toLowerCase() : '';
+}
+
+async function findProjectAccountByEmail(email) {
+  const normalizedEmail = textValue(email).toLowerCase();
+  if (!normalizedEmail || normalizedEmail.indexOf('@') === -1) return null;
+  try {
+    return await AccountModel.onQuery({
+      $or: [
+        { email: normalizedEmail },
+        { 'authen.email': normalizedEmail }
+      ]
+    });
+  } catch (err) {
+    return null;
+  }
+}
+
+async function findProjectAccountByStudentCode(studentCode) {
+  const normalizedStudentCode = normalizeStudentCode(studentCode);
+  if (!normalizedStudentCode) return null;
+  try {
+    return await AccountModel.onQuery({
+      $or: [
+        { code: normalizedStudentCode },
+        { username: normalizedStudentCode },
+        { studentCode: normalizedStudentCode },
+        { barcodeValue: normalizedStudentCode },
+        { 'authen.username': normalizedStudentCode },
+        { 'userinfo.studentCode': normalizedStudentCode },
+        { 'userinfo.code': normalizedStudentCode },
+        { 'hrContext.snapshot.personnelCode': normalizedStudentCode },
+        { 'lifecycle.hrSnapshot.personnelCode': normalizedStudentCode }
+      ]
+    });
+  } catch (err) {
+    return null;
+  }
+}
+
+async function findRegistrationByStudentCode(studentCode) {
+  const normalizedStudentCode = normalizeStudentCode(studentCode);
+  if (!normalizedStudentCode) return null;
+  try {
+    return await GraduateRegistration.findOne({ barcodeValue: normalizedStudentCode })
+      .sort({ updatedAt: -1 })
+      .lean();
+  } catch (err) {
+    return null;
+  }
+}
+
+function toLangArray(value, key) {
+  const normalized = textValue(value);
+  return normalized ? [{ key: key || 'th', value: normalized }] : [];
+}
+
+async function ensureProjectStudentAccount(studentCode, registration) {
+  const normalizedStudentCode = normalizeStudentCode(studentCode);
+  if (!normalizedStudentCode) return null;
+  let account = await findProjectAccountByStudentCode(normalizedStudentCode);
+  if (account) return account;
+
+  const email = textValue(registration && registration.email).toLowerCase();
+  if (email && email.indexOf('@') !== -1) {
+    account = await findProjectAccountByEmail(email);
+    if (account) return account;
+  }
+
+  if (!registration) return null;
+  const created = await AccountModel.onCreate({
+    dateTime: new Date(),
+    code: normalizedStudentCode,
+    email: email && email.indexOf('@') !== -1 ? email : null,
+    authen: [{
+      username: normalizedStudentCode,
+      password: null,
+      email: email && email.indexOf('@') !== -1 ? email : null
+    }],
+    userinfo: {
+      firstName: toLangArray(registration.firstName, 'th'),
+      lastName: toLangArray(registration.lastName, 'th'),
+      msisdn: textValue(registration.phone) || null
+    },
+    control: {
+      sso: false,
+      limit: 4,
+      trustedDevices: [],
+      device: []
+    },
+    verification: []
+  });
+  return created && created.toObject ? created.toObject() : created;
+}
+
+async function createProjectStudentSession(request, studentSignin) {
+  const studentCode = studentSignin && studentSignin.studentCode ? studentSignin.studentCode : '';
+  const registration = studentSignin && studentSignin.registration ? studentSignin.registration : null;
+  const account = studentSignin && studentSignin.account
+    ? studentSignin.account
+    : await ensureProjectStudentAccount(studentCode, registration);
+  if (!account || !account._id) return null;
+
+  const requestHeaders = request && request.headers ? request.headers : {};
+  const token = createToken();
+  const deviceId = textValue(request && request.body && request.body.deviceId);
+  const userAgent = textValue(requestHeaders['user-agent']);
+  const ip = textValue(requestHeaders['x-forwarded-for'] || request.ip);
+  const expiredSeconds = Math.floor(Date.now() / 1000) + Number(config.tokenExpired || 86400);
+  const device = {
+    version: '1',
+    ip: ip || null,
+    device: userAgent || null,
+    xAccessToken: token,
+    expired_key: expiredSeconds,
+    accounts: account._id,
+    deviceId: deviceId || null,
+    fingerprint: deviceId ? crypto.createHash('sha256').update(deviceId + '|' + userAgent).digest('hex') : null,
+    networkKey: ip || null,
+    rememberDeviceRequested: false
+  };
+
+  await AccountModel.onUpdate(
+    { _id: account._id },
+    { $push: { 'control.device': device } }
+  );
+
+  return {
+    token: token,
+    account: account,
+    studentCode: studentCode
+  };
+}
+
+async function resolveStudentSigninData(body) {
+  if (!isStudentCodeSignin(body)) return null;
+  const studentCode = normalizeStudentCode(body.studentCode || body.barcodeValue || body.username || body.code);
+  if (!studentCode) return null;
+
+  const registration = await findRegistrationByStudentCode(studentCode);
+  let account = await findProjectAccountByStudentCode(studentCode);
+  if (!account && registration && registration.email) {
+    account = await findProjectAccountByEmail(registration.email);
+  }
+
+  const email = accountEmail(account) || textValue(registration && registration.email).toLowerCase();
+  const data = Object.assign({}, body, {
+    loginMethod: 'student-code',
+    studentCode: studentCode,
+    barcodeValue: studentCode
+  });
+
+  if (email && email.indexOf('@') !== -1) {
+    data.email = email;
+    delete data.username;
+    delete data.password;
+  } else {
+    data.username = studentCode;
+    data.password = '********';
+  }
+
+  return {
+    studentCode: studentCode,
+    account: account,
+    registration: registration,
+    data: data
+  };
 }
 
 function normalizePermissionPath(value) {
@@ -814,14 +1028,43 @@ async function revokeUserSession(request, accessToken) {
 
 async function forwardScopedSignin(request, response) {
   try {
-    const signinResult = await requestUser(createUserRequestOptions(request, {
+    const studentSignin = await resolveStudentSigninData(request && request.body ? request.body : {});
+    if (studentSignin && studentSignin.registration) {
+      const localSession = await createProjectStudentSession(request, studentSignin);
+      if (localSession && localSession.token) {
+        return response.status(200).json({
+          code: 20000,
+          message: 'Success',
+          data: {
+            xAccessToken: localSession.token,
+            require2FA: false,
+            trustedDeviceMatched: true,
+            studentCode: localSession.studentCode,
+            barcodeValue: localSession.studentCode,
+            localStudentSession: true
+          }
+        });
+      }
+    }
+
+    const signinOptions = createUserRequestOptions(request, {
       method: 'post',
       path: '/signin'
-    }));
+    });
+    if (studentSignin && studentSignin.data) {
+      signinOptions.data = studentSignin.data;
+    }
+
+    const signinResult = await requestUser(signinOptions);
     const payload = signinResult && signinResult.payload ? signinResult.payload : {};
     const accessToken = payload && payload.data && payload.data.xAccessToken
       ? String(payload.data.xAccessToken)
       : '';
+
+    if (studentSignin && studentSignin.studentCode && payload && payload.data) {
+      payload.data.studentCode = studentSignin.studentCode;
+      payload.data.barcodeValue = studentSignin.studentCode;
+    }
 
     if (!accessToken) {
       relaySetCookie(response, signinResult);
@@ -854,6 +1097,19 @@ async function forwardScopedSignin(request, response) {
 
 async function forwardMyPermissions(request, response) {
   try {
+    if (request && request.authSession && request.authSession.source === 'local-student') {
+      return response.status(200).json({
+        status: true,
+        data: {
+          accountId: request.authAccount && request.authAccount._id ? String(request.authAccount._id) : null,
+          assignments: [],
+          permissions: [],
+          matrix: {},
+          allowed: false
+        }
+      });
+    }
+
     const graduationsystemusingfacerecognitionAccount = await loadCurrentGRADUATIONSYSTEMUSINGFACERECOGNITIONGRADUATIONSYSTEMUSINGFACERECOGNITIONAccount(request);
     const email = graduationsystemusingfacerecognitionAccount && graduationsystemusingfacerecognitionAccount.email ? graduationsystemusingfacerecognitionAccount.email : '';
     if (!email) {
