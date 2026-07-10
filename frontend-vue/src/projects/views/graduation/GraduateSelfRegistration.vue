@@ -6,12 +6,6 @@
         <h1>{{ $t('graduation.self.title') }}</h1>
         <p>{{ $t('graduation.self.subtitle') }}</p>
       </div>
-      <div class="registration-header__actions">
-        <CButton color="danger" variant="outline" :disabled="saving" @click="clearAllData">
-          <CIcon name="cil-trash" class="mr-2" />
-          {{ $t('graduation.self.actions.clear') }}
-        </CButton>
-      </div>
     </div>
 
     <CRow>
@@ -189,6 +183,7 @@
             <CRow>
               <CCol md="6">
                 <CSelect
+                  ref="questionnaireEmploymentStatusField"
                   v-model="form.questionnaireEmploymentStatus"
                   :label="questionnaireSampleQuestion"
                   :options="questionnaireSampleOptions"
@@ -417,6 +412,7 @@ const VALIDATION_FIELD_ORDER = [
   'phone',
   'school',
   'program',
+  'questionnaireEmploymentStatus',
   'ceremonyStatus',
   'ceremonyAssistanceType',
   'certificateDeliveryMethod',
@@ -508,6 +504,12 @@ function optionValue (value) {
     if (value.text !== undefined) return optionValue(value.text)
   }
   return String(value == null ? '' : value)
+}
+
+function meaningfulOptionValue (value) {
+  const normalized = optionValue(value).trim()
+  const normalizedLower = normalized.toLowerCase()
+  return ['กรุณาระบุ', 'please specify'].includes(normalizedLower) ? '' : normalized
 }
 
 function normalizeYesNo (value) {
@@ -994,10 +996,10 @@ export default {
               <CInput v-model.trim="address.soi" :label="$t('graduation.address.fields.soi')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
             </CCol>
             <CCol md="3" class="address-required-field">
-              <CInput v-model.trim="address.district" :label="$t('graduation.address.fields.district')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
+              <CInput v-model.trim="address.subdistrict" :label="$t('graduation.address.fields.subdistrict')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
             </CCol>
             <CCol md="3" class="address-required-field">
-              <CInput v-model.trim="address.subdistrict" :label="$t('graduation.address.fields.subdistrict')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
+              <CInput v-model.trim="address.district" :label="$t('graduation.address.fields.district')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
             </CCol>
             <CCol md="3" class="address-required-field">
               <CInput v-model.trim="address.province" :label="$t('graduation.address.fields.province')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
@@ -1160,7 +1162,7 @@ export default {
     },
     questionnaireSampleOptions () {
       return [
-        { label: '', value: '' },
+        { label: this.isEnglishLocale ? 'Please specify' : 'กรุณาระบุ', value: '' },
         { label: this.isEnglishLocale ? 'Employed' : 'ทำงานแล้ว', value: 'employed' },
         { label: this.isEnglishLocale ? 'Not employed yet' : 'ยังไม่ได้ทำงาน', value: 'not-employed' },
         { label: this.isEnglishLocale ? 'Continuing study' : 'ศึกษาต่อ', value: 'study' }
@@ -1199,7 +1201,7 @@ export default {
         .map(item => ({ school: item, labelTh: item, labelEn: item }))
       const schools = [...catalogSchools, ...fallbackSchools]
       return [
-        { label: '', value: '' },
+        { label: this.isEnglishLocale ? 'Please specify' : 'กรุณาระบุ', value: '' },
         ...schools
           .sort((left, right) => localizedCatalogLabel(left, left && left.school, this.isEnglishLocale).localeCompare(localizedCatalogLabel(right, right && right.school, this.isEnglishLocale), this.isEnglishLocale ? 'en' : 'th'))
           .map(item => ({
@@ -1218,7 +1220,7 @@ export default {
       const fallbackPrograms = (catalogPrograms.length || this.schoolProgramCatalog.length) ? [] : (schoolKey ? THAI_SCHOOL_PROGRAMS[schoolKey].map(item => ({ program: item, labelTh: item, labelEn: item })) : [])
       const programs = [...catalogPrograms, ...fallbackPrograms]
       return [
-        { label: '', value: '' },
+        { label: this.isEnglishLocale ? 'Please specify' : 'กรุณาระบุ', value: '' },
         ...programs
           .sort((left, right) => localizedCatalogLabel(left, left && left.program, this.isEnglishLocale).localeCompare(localizedCatalogLabel(right, right && right.program, this.isEnglishLocale), this.isEnglishLocale ? 'en' : 'th'))
           .map(item => ({
@@ -1232,7 +1234,7 @@ export default {
     },
     ceremonyStatusOptions () {
       return [
-        { label: '', value: '' },
+        { label: this.isEnglishLocale ? 'Please specify' : 'กรุณาระบุ', value: '' },
         ...CEREMONY_STATUS_OPTIONS.map(item => ({
           label: `${item.value} - ${this.$t(`graduation.ceremonyStatus.${item.key}`)}`,
           value: item.value
@@ -1251,7 +1253,7 @@ export default {
     },
     ceremonyAssistanceTypeOptions () {
       return [
-        { label: '', value: '' },
+        { label: this.isEnglishLocale ? 'Please specify' : 'กรุณาระบุ', value: '' },
         ...CEREMONY_ASSISTANCE_TYPE_OPTIONS.map(item => ({
           label: `${item.value} - ${this.$t(`graduation.assistanceType.${item.key}`)}`,
           value: item.value
@@ -1284,7 +1286,7 @@ export default {
     },
     certificateDeliveryMethodOptions () {
       return [
-        { label: '', value: '' },
+        { label: this.isEnglishLocale ? 'Please specify' : 'กรุณาระบุ', value: '' },
         { label: this.$t('graduation.certificate.pickup'), value: 'pickup' },
         { label: this.$t('graduation.certificate.postal'), value: 'postal' }
       ]
@@ -1298,18 +1300,18 @@ export default {
       }))
     },
     requiredCompleted () {
-      const requiredFields = ['firstName', 'lastName', 'firstNamePronunciation', 'lastNamePronunciation', 'phone', 'school', 'program', 'ceremonyStatus']
-      let completed = requiredFields.filter(key => !!String(this.form[key] || '').trim()).length
-      if (this.requiresAssistanceType && this.form.ceremonyAssistanceType) completed += 1
-      if (this.requiresCertificateDelivery && this.form.certificateDeliveryMethod) completed += 1
-      if (this.requiresCertificateShipping && this.form.certificateShippingService) completed += 1
+      const requiredFields = ['firstName', 'lastName', 'firstNamePronunciation', 'lastNamePronunciation', 'phone', 'school', 'program', 'ceremonyStatus', 'questionnaireEmploymentStatus']
+      let completed = requiredFields.filter(key => !!meaningfulOptionValue(this.form[key])).length
+      if (this.requiresAssistanceType && meaningfulOptionValue(this.form.ceremonyAssistanceType)) completed += 1
+      if (this.requiresCertificateDelivery && meaningfulOptionValue(this.form.certificateDeliveryMethod)) completed += 1
+      if (this.requiresCertificateShipping && meaningfulOptionValue(this.form.certificateShippingService)) completed += 1
       if (this.requiresCertificateShipping && this.hasAnyAddressValue(this.form.certificateDeliveryAddress)) completed += 1
-      if (this.form.questionnaireEmploymentStatus) completed += 1
       if (this.requiresFoodAllergyNote && this.isValidFoodAllergyNote(this.form.foodAllergyNote)) completed += 1
       return completed
     },
     completionPercent () {
-      let requiredTotal = this.requiresAssistanceType ? 10 : 9
+      let requiredTotal = 9
+      if (this.requiresAssistanceType) requiredTotal += 1
       if (this.requiresCertificateDelivery) requiredTotal += 1
       if (this.requiresCertificateShipping) requiredTotal += 2
       if (this.requiresFoodAllergyNote) requiredTotal += 1
@@ -1344,19 +1346,19 @@ export default {
     validationErrors () {
       const requiredMessage = this.$t('graduation.messages.requiredField')
       const errors = {}
-      ;['firstName', 'lastName', 'firstNamePronunciation', 'lastNamePronunciation', 'phone', 'school', 'program', 'ceremonyStatus']
+      ;['firstName', 'lastName', 'firstNamePronunciation', 'lastNamePronunciation', 'phone', 'school', 'program', 'questionnaireEmploymentStatus', 'ceremonyStatus']
         .forEach(field => {
-          if (!textValue(this.form[field])) {
+          if (!meaningfulOptionValue(this.form[field])) {
             errors[field] = requiredMessage
           }
         })
-      if (this.requiresAssistanceType && !textValue(this.form.ceremonyAssistanceType)) {
+      if (this.requiresAssistanceType && !meaningfulOptionValue(this.form.ceremonyAssistanceType)) {
         errors.ceremonyAssistanceType = requiredMessage
       }
-      if (this.requiresCertificateDelivery && !this.form.certificateDeliveryMethod) {
+      if (this.requiresCertificateDelivery && !meaningfulOptionValue(this.form.certificateDeliveryMethod)) {
         errors.certificateDeliveryMethod = this.$t('graduation.messages.selectCertificateMethod')
       }
-      if (this.requiresCertificateShipping && !this.form.certificateShippingService) {
+      if (this.requiresCertificateShipping && !meaningfulOptionValue(this.form.certificateShippingService)) {
         errors.certificateShippingService = this.$t('graduation.messages.selectShippingService')
       }
       if (this.requiresCertificateShipping && this.hasMissingRequiredAddressFields(this.form.certificateDeliveryAddress)) {
@@ -1440,6 +1442,12 @@ export default {
       if (!this.foodAllergyNoteInvalid) {
         this.foodAllergyAlertShown = false
       }
+    },
+    'form.questionnaireEmploymentStatus' () {
+      this.persistLocalDraft()
+    },
+    'form.questionnaireNote' () {
+      this.persistLocalDraft()
     },
     'form.certificateDeliveryMethod' (next) {
       if (next !== 'postal') {
@@ -1732,8 +1740,12 @@ export default {
         school,
         schoolEnglish: textValue(registration && registration.schoolEnglish),
         program: normalizeProgramName(school, registration && registration.program),
-        programEnglish: textValue(registration && registration.programEnglish)
+        programEnglish: textValue(registration && registration.programEnglish),
+        questionnaireEmploymentStatus: meaningfulOptionValue(registration && registration.questionnaireEmploymentStatus),
+        questionnaireNote: textValue(registration && registration.questionnaireNote)
       }, { source: 'registration' })
+      this.form.questionnaireEmploymentStatus = meaningfulOptionValue(registration && registration.questionnaireEmploymentStatus)
+      this.form.questionnaireNote = textValue(registration && registration.questionnaireNote)
       this.applyAddressDefaults(registration)
       this.applyFixedGraduateName()
     },
@@ -1939,6 +1951,8 @@ export default {
         schoolEnglish: textValue(schoolItem && (schoolItem.schoolEnglish || schoolItem.labelEn)) || textValue(this.form.schoolEnglish),
         program: textValue(this.form.program),
         programEnglish: textValue(programItem && (programItem.programEnglish || programItem.labelEn)) || textValue(this.form.programEnglish),
+        questionnaireEmploymentStatus: meaningfulOptionValue(this.form.questionnaireEmploymentStatus),
+        questionnaireNote: textValue(this.form.questionnaireNote),
         hasFoodAllergy,
         foodAllergyNote: hasFoodAllergy === 'yes' ? this.form.foodAllergyNote : '',
         barcodeValue: this.currentRegistrationBarcodeValue || initialDefaults.studentCode || this.authStudentCode || this.barcodeValue
@@ -1958,7 +1972,9 @@ export default {
           phone: this.composedPhone,
           email: this.authEmail || normalizeEmailText(this.form.email),
           school: textValue(this.form.school),
-          program: textValue(this.form.program)
+          program: textValue(this.form.program),
+          questionnaireEmploymentStatus: meaningfulOptionValue(this.form.questionnaireEmploymentStatus),
+          questionnaireNote: textValue(this.form.questionnaireNote)
         }),
         barcodeValue: savedBarcode,
         currentRegistrationId: savedId,
@@ -2040,6 +2056,8 @@ export default {
         restored.schoolEnglish = textValue(restored.schoolEnglish)
         restored.program = textValue(restored.program)
         restored.programEnglish = textValue(restored.programEnglish)
+        restored.questionnaireEmploymentStatus = meaningfulOptionValue(restored.questionnaireEmploymentStatus)
+        restored.questionnaireNote = textValue(restored.questionnaireNote)
         const restoredCeremonyRaw = normalizeCode(restored.ceremonyStatus)
         if (CEREMONY_ASSISTANCE_TYPE_OPTIONS.some(item => item.value === restoredCeremonyRaw)) {
           restored.ceremonyAssistanceType = restoredCeremonyRaw

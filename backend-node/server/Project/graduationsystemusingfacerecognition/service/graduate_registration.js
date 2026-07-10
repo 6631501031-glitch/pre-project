@@ -101,7 +101,7 @@ function cleanAddress(value) {
 
 function serializeRegistration(row) {
   const item = Object.assign({}, row || {});
-  ['firstName', 'lastName', 'namePronunciation', 'firstNamePronunciation', 'lastNamePronunciation', 'phone', 'email', 'school', 'schoolEnglish', 'program', 'programEnglish', 'ceremonyStatus', 'ceremonyAssistanceType', 'ceremonyStatusNote', 'certificateDeliveryMethod', 'certificateShippingService', 'hasFoodAllergy', 'foodAllergyNote', 'barcodeValue'].forEach(function (field) {
+  ['firstName', 'lastName', 'namePronunciation', 'firstNamePronunciation', 'lastNamePronunciation', 'phone', 'email', 'school', 'schoolEnglish', 'program', 'programEnglish', 'ceremonyStatus', 'ceremonyAssistanceType', 'ceremonyStatusNote', 'certificateDeliveryMethod', 'certificateShippingService', 'hasFoodAllergy', 'foodAllergyNote', 'questionnaireEmploymentStatus', 'questionnaireNote', 'barcodeValue'].forEach(function (field) {
     item[field] = cleanText(item[field]);
   });
   item.homeAddress = cleanAddress(item.homeAddress);
@@ -305,6 +305,8 @@ function payloadFromBody(body) {
     certificateDeliveryAddress: certificateDeliveryMethod === 'postal' ? cleanAddress(body.certificateDeliveryAddress) : cleanAddress({}),
     hasFoodAllergy: cleanYesNo(body.hasFoodAllergy, foodAllergyNote),
     foodAllergyNote: foodAllergyNote,
+    questionnaireEmploymentStatus: cleanText(body.questionnaireEmploymentStatus),
+    questionnaireNote: cleanText(body.questionnaireNote),
     barcodeValue: cleanText(body.barcodeValue),
     facePhoto: cleanFacePhoto(body.facePhoto),
     facePhotoCapturedAt: cleanFacePhoto(body.facePhoto) ? new Date() : null
@@ -313,6 +315,9 @@ function payloadFromBody(body) {
 
 function validatePayload(payload) {
   const missing = [];
+  if (!payload.questionnaireEmploymentStatus) {
+    missing.push('questionnaireEmploymentStatus');
+  }
   if (payload.hasFoodAllergy === 'yes' && !isMeaningfulFoodAllergyNote(payload.foodAllergyNote)) {
     missing.push('foodAllergyNote');
   }
