@@ -865,7 +865,7 @@ const en = {
 
 en.graduation = {
     nav: {
-        selfRegistration: "Graduate questionnaire",
+        selfRegistration: "Student intention request system",
         registrationAdmin: "Graduate registration data"
     },
     fields: {
@@ -945,7 +945,7 @@ en.graduation = {
         method: "Certificate receiving method",
         methodPlaceholder: "Select certificate receiving method",
         pickup: "Pick up in person",
-        postal: "Send by post to a new address",
+        postal: "Send by post",
         shippingService: "Shipping service",
         shippingPlaceholder: "Select shipping service",
         deliveryAddress: "Certificate delivery address",
@@ -970,9 +970,9 @@ en.graduation = {
         }
     },
     self: {
-        eyebrow: "Graduate Questionnaire",
-        title: "Graduate questionnaire",
-        subtitle: "Fill in graduate information for name verification and save the questionnaire data.",
+        eyebrow: "Student intention request system",
+        title: "Student intention request system",
+        subtitle: "Submit an intention request and complete the questionnaire.",
         sections: {
             name: "Announcement name",
             school: "School and program",

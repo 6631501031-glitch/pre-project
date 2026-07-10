@@ -22,6 +22,7 @@ const addressSchema = new Schema({
 }, { _id: false });
 
 const graduateRegistrationSchema = new Schema({
+  accountId: { type: Schema.ObjectId, default: null, index: true },
   firstName: { type: String, trim: true, default: null, index: true },
   lastName: { type: String, trim: true, default: null, index: true },
   namePronunciation: { type: String, trim: true, default: null },
@@ -44,6 +45,8 @@ const graduateRegistrationSchema = new Schema({
   certificateDeliveryAddress: { type: addressSchema, default: () => ({}) },
   hasFoodAllergy: { type: String, enum: ['yes', 'no'], default: 'no' },
   foodAllergyNote: { type: String, trim: true, default: null },
+  questionnaireEmploymentStatus: { type: String, trim: true, default: null },
+  questionnaireNote: { type: String, trim: true, default: null },
   barcodeValue: { type: String, trim: true, default: null, index: true },
   facePhoto: { type: String, default: null },
   facePhotoCapturedAt: { type: Date, default: null },
