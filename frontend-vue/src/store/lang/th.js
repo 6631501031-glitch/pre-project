@@ -867,7 +867,7 @@ const th = {
 
 th.graduation = {
     nav: {
-        selfRegistration: "แบบสอบถามบัณฑิต",
+        selfRegistration: "ระบบแจ้งความประสงค์นักศึกษา",
         registrationAdmin: "ข้อมูลลงทะเบียนบัณฑิต",
     },
     fields: {
@@ -947,7 +947,7 @@ th.graduation = {
         method: "ช่องทางการรับประกาศนียบัตร",
         methodPlaceholder: "เลือกช่องทางการรับประกาศนียบัตร",
         pickup: "มารับเอง",
-        postal: "ส่งไปรษณีย์ตามที่อยู่ใหม่",
+        postal: "ส่งไปรษณีย์",
         shippingService: "บริการจัดส่ง",
         shippingPlaceholder: "เลือกบริการจัดส่ง",
         deliveryAddress: "ที่อยู่สำหรับจัดส่งประกาศนียบัตร",
@@ -972,9 +972,9 @@ th.graduation = {
         }
     },
     self: {
-        eyebrow: "Graduate Questionnaire",
-        title: "แบบสอบถามข้อมูลบัณฑิต",
-        subtitle: "\u0e01\u0e23\u0e2d\u0e01\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e1a\u0e31\u0e13\u0e11\u0e34\u0e15\u0e41\u0e25\u0e30\u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e1a\u0e1a\u0e2a\u0e2d\u0e1a\u0e16\u0e32\u0e21",
+        eyebrow: "ระบบแจ้งความประสงค์นักศึกษา",
+        title: "ระบบแจ้งความประสงค์นักศึกษา",
+        subtitle: "แจ้งความประสงค์และทำแบบสอบถาม",
         sections: {
             name: "ชื่อสำหรับประกาศ",
             school: "สำนักวิชาและสาขา",

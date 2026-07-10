@@ -2,6 +2,7 @@
 
 const mongoose = require('mongoose');
 const GraduateRegistration = require('../models/graduate_registration.model');
+const GRADUATE_INITIAL_CATALOG = require('./graduate_initial_catalog');
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 4000;
@@ -41,10 +42,6 @@ function cleanFacePhoto(value) {
   const normalized = cleanText(value);
   if (!normalized) return null;
   return /^data:image\/(jpeg|jpg|png|webp);base64,/i.test(normalized) ? normalized : null;
-}
-
-function escapeRegExp(value) {
-  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function cleanCode(value) {
@@ -114,11 +111,6 @@ function serializeRegistration(row) {
   return item;
 }
 
-function pushSearchTerm(terms, value) {
-  const normalized = cleanText(value);
-  if (normalized && !terms.includes(normalized)) terms.push(normalized);
-}
-
 function pushStudentCodeTerm(terms, value) {
   const normalized = cleanStudentCode(value);
   if (normalized && !terms.includes(normalized)) terms.push(normalized);
@@ -177,41 +169,95 @@ function accountEmailTerms(request, query) {
   return terms;
 }
 
-function accountSearchTerms(request, query) {
-  const account = request && request.authAccount ? request.authAccount : {};
-  const userinfo = account && account.userinfo && typeof account.userinfo === 'object' ? account.userinfo : {};
-  const terms = [];
-  pushSearchTerm(terms, account.email);
-  pushSearchTerm(terms, account.username);
-  pushSearchTerm(terms, account.code);
-  pushSearchTerm(terms, account.studentCode);
-  pushSearchTerm(terms, account.barcodeValue);
-  pushSearchTerm(terms, userinfo.email);
-  pushSearchTerm(terms, userinfo.phone);
-  pushSearchTerm(terms, userinfo.mobile);
-  pushSearchTerm(terms, userinfo.msisdn);
-  pushSearchTerm(terms, userinfo.firstName);
-  pushSearchTerm(terms, userinfo.lastName);
-  pushSearchTerm(terms, query && query.studentCode);
-  pushSearchTerm(terms, query && query.barcodeValue);
-  pushSearchTerm(terms, query && query.email);
-  pushSearchTerm(terms, query && query.phone);
-  pushSearchTerm(terms, query && query.firstName);
-  pushSearchTerm(terms, query && query.lastName);
-  return terms;
+function initialRecordForAccount(request) {
+  const studentCodes = accountStudentCodeTerms(request || {}, {});
+  const emails = accountEmailTerms(request || {}, {});
+  return GRADUATE_INITIAL_CATALOG.find(function (item) {
+    const studentCode = cleanStudentCode(item && item.studentCode);
+    return studentCode && studentCodes.includes(studentCode);
+  }) || GRADUATE_INITIAL_CATALOG.find(function (item) {
+    const email = cleanEmail(item && item.email);
+    return email && emails.includes(email);
+  }) || null;
 }
 
-function registrationScore(row, terms) {
-  const normalizedTerms = terms.map(function (term) {
-    return String(term || '').toLowerCase();
-  });
-  let score = 0;
-  if (row.barcodeValue && normalizedTerms.includes(String(row.barcodeValue).toLowerCase())) score += 120;
-  if (row.email && normalizedTerms.includes(String(row.email).toLowerCase())) score += 100;
-  if (row.phone && normalizedTerms.includes(String(row.phone).toLowerCase())) score += 80;
-  if (row.firstName && normalizedTerms.includes(String(row.firstName).toLowerCase())) score += 30;
-  if (row.lastName && normalizedTerms.includes(String(row.lastName).toLowerCase())) score += 30;
-  return score;
+function initialSchoolName(value) {
+  const school = cleanText(value);
+  if (!school) return null;
+  return school.indexOf('สำนักวิชา') === 0 ? school : 'สำนักวิชา' + school;
+}
+
+function registrationFromInitialRecord(record) {
+  if (!record) return null;
+  return {
+    accountId: null,
+    firstName: cleanText(record.firstName) || cleanText(record.firstNameEnglish),
+    lastName: cleanText(record.lastName) || cleanText(record.lastNameEnglish),
+    phone: cleanText(record.phone),
+    email: cleanEmail(record.email),
+    school: initialSchoolName(record.school),
+    schoolEnglish: cleanText(record.schoolEnglish),
+    program: cleanText(record.program),
+    programEnglish: cleanText(record.programEnglish),
+    barcodeValue: cleanStudentCode(record.studentCode)
+  };
+}
+
+function firstAccountText() {
+  for (let index = 0; index < arguments.length; index += 1) {
+    const value = cleanText(arguments[index]);
+    if (value) return value;
+  }
+  return null;
+}
+
+function accountIdentityDefaults(request) {
+  const account = request && request.authAccount ? request.authAccount : {};
+  const userinfo = account && account.userinfo && typeof account.userinfo === 'object' ? account.userinfo : {};
+  const lifecycle = account && account.lifecycle && typeof account.lifecycle === 'object' ? account.lifecycle : {};
+  const hrContext = account && account.hrContext && typeof account.hrContext === 'object' ? account.hrContext : {};
+  const snapshot = lifecycle.hrSnapshot || (hrContext && hrContext.snapshot) || {};
+  const studentCodes = accountStudentCodeTerms(request || {}, {});
+  const emails = accountEmailTerms(request || {}, {});
+  const initial = registrationFromInitialRecord(initialRecordForAccount(request || {})) || {};
+  return {
+    accountId: account._id || account.id || null,
+    firstName: initial.firstName || firstAccountText(account.firstName, userinfo.firstName, snapshot.firstName, account.givenName, userinfo.givenName),
+    lastName: initial.lastName || firstAccountText(account.lastName, userinfo.lastName, snapshot.lastName, account.familyName, userinfo.familyName),
+    email: initial.email || emails[0] || null,
+    studentCode: initial.barcodeValue || studentCodes[0] || null,
+    school: initial.school || null,
+    schoolEnglish: initial.schoolEnglish || null,
+    program: initial.program || null,
+    programEnglish: initial.programEnglish || null,
+    phone: initial.phone || null
+  };
+}
+
+function applyAccountIdentity(payload, request) {
+  const identity = accountIdentityDefaults(request || {});
+  if (identity.accountId) payload.accountId = identity.accountId;
+  if (identity.firstName) payload.firstName = identity.firstName;
+  if (identity.lastName) payload.lastName = identity.lastName;
+  if (identity.email) payload.email = identity.email;
+  if (identity.studentCode) payload.barcodeValue = identity.studentCode;
+  if (identity.school) payload.school = identity.school;
+  if (identity.schoolEnglish) payload.schoolEnglish = identity.schoolEnglish;
+  if (identity.program) payload.program = identity.program;
+  if (identity.programEnglish) payload.programEnglish = identity.programEnglish;
+  return payload;
+}
+
+function accountOwnershipFilter(id, request) {
+  const filter = { _id: new mongoose.Types.ObjectId(id) };
+  const identity = accountIdentityDefaults(request || {});
+  const ownership = [];
+  if (identity.accountId) ownership.push({ accountId: identity.accountId });
+  if (identity.studentCode) ownership.push({ barcodeValue: identity.studentCode });
+  if (identity.email) ownership.push({ email: identity.email });
+  if (ownership.length) filter.$or = ownership;
+  if (!ownership.length) filter._id = null;
+  return filter;
 }
 
 function actorFromRequest(request) {
@@ -405,13 +451,20 @@ exports.options = async function options() {
 };
 
 exports.defaultsForAccount = async function defaultsForAccount(request, query) {
+  const identity = accountIdentityDefaults(request || {});
+  if (identity.accountId) {
+    const accountRow = await GraduateRegistration.findOne({ accountId: identity.accountId })
+      .sort({ updatedAt: -1 })
+      .lean();
+    if (accountRow) return serializeRegistration(accountRow);
+  }
+
   const studentCodeTerms = accountStudentCodeTerms(request || {}, query || {});
   if (studentCodeTerms.length) {
     const exactStudentRow = await GraduateRegistration.findOne({ barcodeValue: { $in: studentCodeTerms } })
       .sort({ updatedAt: -1 })
       .lean();
     if (exactStudentRow) return serializeRegistration(exactStudentRow);
-    if (queryStudentCodeTerms(query || {}).length) return null;
   }
 
   const emailTerms = accountEmailTerms(request || {}, query || {});
@@ -419,39 +472,21 @@ exports.defaultsForAccount = async function defaultsForAccount(request, query) {
     const exactEmailRow = await GraduateRegistration.findOne({ email: { $in: emailTerms } })
       .sort({ updatedAt: -1 })
       .lean();
-    return exactEmailRow ? serializeRegistration(exactEmailRow) : null;
+    if (exactEmailRow) return serializeRegistration(exactEmailRow);
   }
 
-  const terms = accountSearchTerms(request || {}, query || {});
-  if (!terms.length) return null;
+  const initial = registrationFromInitialRecord(initialRecordForAccount(request || {}));
+  if (initial) {
+    const identity = accountIdentityDefaults(request || {});
+    initial.accountId = identity.accountId;
+    return serializeRegistration(initial);
+  }
 
-  const filters = [];
-  terms.forEach(function (term) {
-    const expression = new RegExp(escapeRegExp(term), 'i');
-    filters.push({ firstName: expression });
-    filters.push({ lastName: expression });
-    filters.push({ phone: expression });
-    filters.push({ email: expression });
-    filters.push({ barcodeValue: expression });
-  });
-
-  const rows = await GraduateRegistration.find({ $or: filters })
-    .sort({ updatedAt: -1 })
-    .limit(50)
-    .lean();
-  const best = rows
-    .map(function (row) {
-      return { row: row, score: registrationScore(row, terms) };
-    })
-    .sort(function (left, right) {
-      return right.score - left.score;
-    })[0];
-
-  return best && best.score > 0 ? serializeRegistration(best.row) : null;
+  return null;
 };
 
 exports.create = async function create(body, request) {
-  const payload = payloadFromBody(body || {});
+  const payload = applyAccountIdentity(payloadFromBody(body || {}), request);
   validatePayload(payload);
   payload.create = actorFromRequest(request || {});
   const created = await GraduateRegistration.create(payload);
@@ -465,18 +500,18 @@ exports.update = async function update(id, body, request) {
     throw error;
   }
 
-  const payload = payloadFromBody(body || {});
+  const payload = applyAccountIdentity(payloadFromBody(body || {}), request);
   validatePayload(payload);
   payload.update = actorFromRequest(request || {});
 
   const updated = await GraduateRegistration.findOneAndUpdate(
-    { _id: new mongoose.Types.ObjectId(id) },
+    accountOwnershipFilter(id, request),
     payload,
     { new: true, runValidators: true }
   ).lean();
 
   if (!updated) {
-    const error = new Error('Graduate registration not found');
+    const error = new Error('Graduate registration not found for current account');
     error.status = 404;
     throw error;
   }

@@ -22,6 +22,7 @@ const addressSchema = new Schema({
 }, { _id: false });
 
 const graduateRegistrationSchema = new Schema({
+  accountId: { type: Schema.ObjectId, default: null, index: true },
   firstName: { type: String, trim: true, default: null, index: true },
   lastName: { type: String, trim: true, default: null, index: true },
   namePronunciation: { type: String, trim: true, default: null },
