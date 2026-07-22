@@ -867,8 +867,43 @@ const th = {
 
 th.graduation = {
     nav: {
-        selfRegistration: "แบบสอบถามบัณฑิต",
+        selfRegistration: "ระบบแจ้งความประสงค์นักศึกษา",
         registrationAdmin: "ข้อมูลลงทะเบียนบัณฑิต",
+        checkinDashboard: "แดชบอร์ดเช็กชื่อ",
+    },
+    checkin: {
+        eyebrow: "แดชบอร์ดเช็กชื่อ",
+        title: "แดชบอร์ดเช็กชื่อบัณฑิต",
+        subtitle: "ภาพรวมสำหรับวันซ้อมและวันจริง ใช้ติดตามจำนวนผู้ลงทะเบียน ความพร้อมข้อมูล และรายการที่ต้องเช็กชื่อหน้างาน",
+        actions: { refresh: "รีเฟรช", openCheckin: "เปิดหน้าเช็กชื่อ", checkin: "เช็กชื่อ" },
+        modes: {
+            rehearsal: { label: "วันซ้อม", note: "ตรวจรายชื่อ ทดลองเช็กชื่อ และดูความพร้อมข้อมูล" },
+            ceremony: { label: "วันจริง", note: "ใช้ยืนยันตัวตนและติดตามบัณฑิตหน้าไซต์" }
+        },
+        metrics: {
+            total: "ทั้งหมด", totalHint: "รายการลงทะเบียน",
+            checked: "เช็กชื่อแล้ว", checkedHint: "{rate}% ของโหมด{mode}",
+            pending: "รอเช็กชื่อ", pendingHint: "จำลองจากรายชื่อทั้งหมด",
+            review: "ต้องตรวจสอบ", reviewHint: "ข้อมูลหรือการยืนยันมีข้อสังเกต"
+        },
+        progress: {
+            checkedFrom: "เช็กชื่อแล้วจาก {total} คน",
+            pendingReview: "รอ {pending} / ตรวจสอบ {review}"
+        },
+        roster: {
+            title: "รายการสำหรับเช็กชื่อ",
+            subtitle: "ค้นจากชื่อ เบอร์ อีเมล สำนักวิชา หรือสาขา",
+            searchPlaceholder: "ค้นหารายชื่อ",
+            graduate: "บัณฑิต",
+            schoolProgram: "สำนักวิชา / สาขา",
+            loading: "กำลังโหลดข้อมูล",
+            empty: "ไม่พบข้อมูลที่ตรงกับคำค้น"
+        },
+        pagination: {
+            showing: "แสดง", ofNames: "จาก {total} รายชื่อ",
+            previous: "ก่อนหน้า", page: "หน้า", next: "ถัดไป"
+        },
+        loadError: "ไม่สามารถโหลดข้อมูลเช็กชื่อได้"
     },
     fields: {
         firstName: "ชื่อจริง",
@@ -947,7 +982,7 @@ th.graduation = {
         method: "ช่องทางการรับประกาศนียบัตร",
         methodPlaceholder: "เลือกช่องทางการรับประกาศนียบัตร",
         pickup: "มารับเอง",
-        postal: "ส่งไปรษณีย์ตามที่อยู่ใหม่",
+        postal: "ส่งไปรษณีย์",
         shippingService: "บริการจัดส่ง",
         shippingPlaceholder: "เลือกบริการจัดส่ง",
         deliveryAddress: "ที่อยู่สำหรับจัดส่งประกาศนียบัตร",
@@ -972,9 +1007,9 @@ th.graduation = {
         }
     },
     self: {
-        eyebrow: "Graduate Questionnaire",
-        title: "แบบสอบถามข้อมูลบัณฑิต",
-        subtitle: "\u0e01\u0e23\u0e2d\u0e01\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e1a\u0e31\u0e13\u0e11\u0e34\u0e15\u0e41\u0e25\u0e30\u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e1a\u0e1a\u0e2a\u0e2d\u0e1a\u0e16\u0e32\u0e21",
+        eyebrow: "ระบบแจ้งความประสงค์นักศึกษา",
+        title: "ระบบแจ้งความประสงค์นักศึกษา",
+        subtitle: "แจ้งความประสงค์และทำแบบสอบถาม",
         sections: {
             name: "ชื่อสำหรับประกาศ",
             school: "สำนักวิชาและสาขา",
@@ -996,7 +1031,7 @@ th.graduation = {
         eyebrow: "Graduation Registration Admin",
         title: "ข้อมูลลงทะเบียนบัณฑิต",
         subtitle: "ตรวจสอบข้อมูลจากแบบสอบถามบัณฑิตที่บันทึกลง MongoDB",
-        searchPlaceholder: "ค้นหา ชื่อ, เบอร์, อีเมล, barcode",
+        searchPlaceholder: "ค้นหา ชื่อ, เบอร์, อีเมล",
         loading: "กำลังโหลดข้อมูล",
         empty: "ยังไม่มีข้อมูลลงทะเบียน",
         detailsTitle: "รายละเอียดข้อมูลลงทะเบียน",

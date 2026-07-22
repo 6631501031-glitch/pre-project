@@ -22,6 +22,7 @@ const addressSchema = new Schema({
 }, { _id: false });
 
 const graduateRegistrationSchema = new Schema({
+  accountId: { type: Schema.ObjectId, default: null, index: true },
   firstName: { type: String, trim: true, default: null, index: true },
   lastName: { type: String, trim: true, default: null, index: true },
   namePronunciation: { type: String, trim: true, default: null },
@@ -37,6 +38,7 @@ const graduateRegistrationSchema = new Schema({
   currentAddress: { type: addressSchema, default: () => ({}) },
   workAddress: { type: addressSchema, default: () => ({}) },
   ceremonyStatus: { type: String, trim: true, default: null, index: true },
+  ceremonyStatusLabel: { type: String, trim: true, default: null, index: true },
   ceremonyAssistanceType: { type: String, trim: true, default: null, index: true },
   ceremonyStatusNote: { type: String, trim: true, default: null },
   certificateDeliveryMethod: { type: String, trim: true, default: null },
@@ -44,6 +46,9 @@ const graduateRegistrationSchema = new Schema({
   certificateDeliveryAddress: { type: addressSchema, default: () => ({}) },
   hasFoodAllergy: { type: String, enum: ['yes', 'no'], default: 'no' },
   foodAllergyNote: { type: String, trim: true, default: null },
+  questionnaireEmploymentStatus: { type: String, trim: true, default: null },
+  questionnaireNote: { type: String, trim: true, default: null },
+  studentCode: { type: String, trim: true, default: null, index: true },
   barcodeValue: { type: String, trim: true, default: null, index: true },
   facePhoto: { type: String, default: null },
   facePhotoCapturedAt: { type: Date, default: null },
@@ -62,6 +67,8 @@ graduateRegistrationSchema.index({
   schoolEnglish: 'text',
   program: 'text',
   programEnglish: 'text',
+  ceremonyStatusLabel: 'text',
+  studentCode: 'text',
   barcodeValue: 'text'
 });
 

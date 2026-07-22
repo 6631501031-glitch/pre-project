@@ -6,12 +6,6 @@
         <h1>{{ $t('graduation.self.title') }}</h1>
         <p>{{ $t('graduation.self.subtitle') }}</p>
       </div>
-      <div class="registration-header__actions">
-        <CButton color="danger" variant="outline" :disabled="saving" @click="clearAllData">
-          <CIcon name="cil-trash" class="mr-2" />
-          {{ $t('graduation.self.actions.clear') }}
-        </CButton>
-      </div>
     </div>
 
     <CRow>
@@ -181,6 +175,31 @@
           </CCardBody>
         </CCard>
 
+        <CCard class="registration-card questionnaire-sample-card mt-3">
+          <CCardBody>
+            <div class="section-heading questionnaire-sample-heading">
+              <h2>{{ questionnaireSampleTitle }}<span class="required-mark">*</span></h2>
+            </div>
+            <CRow>
+              <CCol md="6">
+                <CSelect
+                  ref="questionnaireEmploymentStatusField"
+                  v-model="form.questionnaireEmploymentStatus"
+                  :label="questionnaireSampleQuestion"
+                  :options="questionnaireSampleOptions"
+                />
+              </CCol>
+              <CCol md="6">
+                <CTextarea
+                  v-model.trim="form.questionnaireNote"
+                  :label="questionnaireSampleNoteLabel"
+                  rows="2"
+                />
+              </CCol>
+            </CRow>
+          </CCardBody>
+        </CCard>
+
         <CCard class="registration-card mt-3">
           <CCardBody>
             <div class="section-heading ceremony-section-heading">
@@ -249,9 +268,7 @@
                           :aria-pressed="form.certificateShippingService === item.value ? 'true' : 'false'"
                           @click="selectCertificateShippingService(item.value)"
                         >
-                          <span class="shipping-rate-card__check">
-                            <CIcon v-if="form.certificateShippingService === item.value" name="cil-check" />
-                          </span>
+                          <span class="shipping-rate-card__check" aria-hidden="true"></span>
                           <strong>{{ item.label }}</strong>
                           <span>{{ item.description }}</span>
                           <em>{{ item.fee }}</em>
@@ -268,10 +285,13 @@
                         :title="$t('graduation.certificate.deliveryAddress')"
                         :address="form.certificateDeliveryAddress"
                         :required="true"
+                        :readonly="isAddressReadonly('certificateDeliveryAddress')"
                         :source-options="addressSourceOptions('certificateDeliveryAddress')"
                         :edit-label="addressEditLabel"
                         :save-label="addressSaveLabel"
+                        @edit="enableAddressEdit('certificateDeliveryAddress')"
                         @select-source="onAddressSourceSelect('certificateDeliveryAddress', $event)"
+                        @save="saveAddressEdit('certificateDeliveryAddress')"
                       />
                     </div>
                     <div v-if="hasFieldError('certificateDeliveryAddress')" class="invalid-feedback d-block">{{ validationErrors.certificateDeliveryAddress }}</div>
@@ -347,6 +367,14 @@
                 <span>{{ $t('graduation.self.summary.ceremonyStatus') }}</span>
                 <strong>{{ ceremonyStatusLabel }}</strong>
               </div>
+              <div>
+                <span>{{ $t('graduation.fields.foodAllergy') }}</span>
+                <strong>{{ foodAllergySummaryLabel }}</strong>
+              </div>
+              <div v-if="requiresFoodAllergyNote">
+                <span>{{ $t('graduation.fields.foodAllergyNote') }}</span>
+                <strong>{{ form.foodAllergyNote || '-' }}</strong>
+              </div>
             </div>
             <div class="summary-progress-label">
               <span>{{ completionPercent }}%</span>
@@ -356,7 +384,7 @@
               <span :style="{ width: completionPercent + '%' }"></span>
             </div>
             <div class="summary-actions">
-              <CButton color="primary" :disabled="saving" class="summary-save-button" @click="goToFacePage">
+              <CButton color="primary" :disabled="saveButtonDisabled" class="summary-save-button" @click="goToFacePage">
                 <CIcon name="cil-save" class="mr-2" />
                 {{ saving ? $t('graduation.self.actions.saving') : $t('graduation.self.actions.save') }}
               </CButton>
@@ -371,14 +399,10 @@
 <script>
 import api from '@/service/api'
 import { notifyError, notifySuccess } from '@/projects/utils/notify'
+import SCHOOL_PROGRAM_CATALOG from './school-program-catalog'
+import GRADUATE_INITIAL_CATALOG from './graduate-initial-catalog'
 
 const STORAGE_KEY = 'graduate-self-registration-draft'
-const GRADUATE_NAME_OVERRIDES = {
-  6631501034: {
-    firstName: 'ณัฐพร',
-    lastName: 'ดิบดี'
-  }
-}
 
 const VALIDATION_FIELD_ORDER = [
   'firstName',
@@ -388,6 +412,7 @@ const VALIDATION_FIELD_ORDER = [
   'phone',
   'school',
   'program',
+  'questionnaireEmploymentStatus',
   'ceremonyStatus',
   'ceremonyAssistanceType',
   'certificateDeliveryMethod',
@@ -481,6 +506,12 @@ function optionValue (value) {
   return String(value == null ? '' : value)
 }
 
+function meaningfulOptionValue (value) {
+  const normalized = optionValue(value).trim()
+  const normalizedLower = normalized.toLowerCase()
+  return ['กรุณาระบุ', 'please specify'].includes(normalizedLower) ? '' : normalized
+}
+
 function normalizeYesNo (value) {
   const normalized = optionValue(value).trim().toLowerCase()
   if (['yes', 'true', '1', 'มี'].includes(normalized)) return 'yes'
@@ -512,6 +543,8 @@ function normalizeCeremonyStatus (value) {
 
 function schoolKeyFor (school) {
   const normalized = normalizeOptionValue(school)
+  const catalogMatch = SCHOOL_PROGRAM_CATALOG.find(item => normalizeOptionValue(item && item.school) === normalized)
+  if (catalogMatch) return textValue(catalogMatch.school)
   return Object.keys(THAI_SCHOOL_PROGRAMS).find(item => normalizeOptionValue(item) === normalized)
 }
 
@@ -542,6 +575,7 @@ const CEREMONY_STATUS_OPTIONS = [
   { value: '60', key: '60' },
   { value: '70', key: '70' }
 ]
+const FACE_CHECKIN_CEREMONY_STATUS_CODES = ['10', '20', '30', '40']
 
 const LEGACY_CEREMONY_STATUS_MAP = {
   1: '10',
@@ -610,6 +644,9 @@ function phoneDialDigits (country) {
 
 const ADDRESS_SOURCE_KEYS = ['homeAddress', 'currentAddress', 'workAddress']
 const ADDRESS_COPY_SOURCE_KEYS = ['currentAddress', 'homeAddress']
+const CERTIFICATE_ADDRESS_COPY_SOURCE_KEYS = ['currentAddress', 'homeAddress', 'workAddress']
+const ADDRESS_FIELD_KEYS = ['houseNo', 'moo', 'soi', 'road', 'subdistrict', 'district', 'province', 'postalCode']
+const REQUIRED_ADDRESS_FIELD_KEYS = ['houseNo', 'moo', 'subdistrict', 'district', 'province', 'postalCode']
 
 function emptyAddress () {
   return {
@@ -645,6 +682,8 @@ const EMPTY_FORM = {
   ceremonyStatus: '',
   ceremonyAssistanceType: '',
   ceremonyStatusNote: '',
+  questionnaireEmploymentStatus: '',
+  questionnaireNote: '',
   hasFoodAllergy: 'no',
   foodAllergyNote: ''
 }
@@ -807,6 +846,11 @@ function normalizeSchoolName (value) {
 function normalizeProgramName (school, value) {
   const normalized = textValue(value)
   if (!normalized) return ''
+  const catalogSchool = SCHOOL_PROGRAM_CATALOG.find(item => schoolComparableValue(item && item.school) === schoolComparableValue(school))
+  const catalogPrograms = catalogSchool && Array.isArray(catalogSchool.programs) ? catalogSchool.programs : []
+  const catalogMatch = catalogPrograms.find(item => normalizeOptionValue(item && item.program) === normalizeOptionValue(normalized)) ||
+    catalogPrograms.find(item => normalizeOptionValue(textValue(item && item.program).replace(/^สาขาวิชา/, '')) === normalizeOptionValue(normalized.replace(/^สาขาวิชา/, '')))
+  if (catalogMatch) return textValue(catalogMatch.program)
   const schoolKey = schoolKeyFor(school)
   const programs = schoolKey ? THAI_SCHOOL_PROGRAMS[schoolKey] : []
   return programs.find(item => normalizeOptionValue(item) === normalizeOptionValue(normalized)) ||
@@ -853,6 +897,42 @@ function profileRegistrationDefaults (profile) {
   }
 }
 
+function isRequiredAddressValueFilled (address, field) {
+  const value = textValue(address && address[field])
+  if (!value) return false
+  return field === 'postalCode' ? !!normalizePhoneDigits(value) : true
+}
+
+function hasMissingRequiredAddressFields (address) {
+  return REQUIRED_ADDRESS_FIELD_KEYS.some(field => !isRequiredAddressValueFilled(address, field))
+}
+
+function findGraduateInitialRecord (studentCode, email) {
+  const normalizedStudentCode = normalizeStudentCode(studentCode)
+  const normalizedEmail = normalizeEmailText(email)
+  return GRADUATE_INITIAL_CATALOG.find(item => (
+    normalizedStudentCode && normalizeStudentCode(item && item.studentCode) === normalizedStudentCode
+  )) || GRADUATE_INITIAL_CATALOG.find(item => (
+    normalizedEmail && normalizeEmailText(item && item.email) === normalizedEmail
+  )) || null
+}
+
+function graduateInitialDefaults (record) {
+  if (!record) return {}
+  const school = normalizeSchoolName(record.school)
+  return {
+    firstName: textValue(record.firstName) || textValue(record.firstNameEnglish),
+    lastName: textValue(record.lastName) || textValue(record.lastNameEnglish),
+    phone: textValue(record.phone),
+    email: normalizeEmailText(record.email),
+    school,
+    schoolEnglish: textValue(record.schoolEnglish),
+    program: normalizeProgramName(school, record.program),
+    programEnglish: textValue(record.programEnglish),
+    studentCode: normalizeStudentCode(record.studentCode)
+  }
+}
+
 export default {
   name: 'GraduateSelfRegistration',
   components: {
@@ -895,6 +975,7 @@ export default {
               variant="outline"
               size="sm"
               class="address-choice-button"
+              :disabled="readonly"
               @click="$emit('select-source', option.value)"
             >
               <CIcon name="cil-copy" class="mr-1" />
@@ -902,10 +983,10 @@ export default {
             </CButton>
           </div>
           <CRow class="address-grid">
-            <CCol md="3">
+            <CCol md="3" class="address-required-field">
               <CInput v-model.trim="address.houseNo" :label="$t('graduation.address.fields.houseNo')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
             </CCol>
-            <CCol md="3">
+            <CCol md="3" class="address-required-field">
               <CInput v-model.trim="address.moo" :label="$t('graduation.address.fields.moo')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
             </CCol>
             <CCol md="3">
@@ -914,17 +995,28 @@ export default {
             <CCol md="3">
               <CInput v-model.trim="address.soi" :label="$t('graduation.address.fields.soi')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
             </CCol>
-            <CCol md="3">
-              <CInput v-model.trim="address.district" :label="$t('graduation.address.fields.district')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
-            </CCol>
-            <CCol md="3">
+            <CCol md="3" class="address-required-field">
               <CInput v-model.trim="address.subdistrict" :label="$t('graduation.address.fields.subdistrict')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
             </CCol>
-            <CCol md="3">
+            <CCol md="3" class="address-required-field">
+              <CInput v-model.trim="address.district" :label="$t('graduation.address.fields.district')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
+            </CCol>
+            <CCol md="3" class="address-required-field">
               <CInput v-model.trim="address.province" :label="$t('graduation.address.fields.province')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
             </CCol>
-            <CCol md="3">
-              <CInput v-model.trim="address.postalCode" :label="$t('graduation.address.fields.postalCode')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
+            <CCol md="3" class="address-required-field">
+              <CInput
+                v-model.trim="address.postalCode"
+                type="tel"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                :label="$t('graduation.address.fields.postalCode')"
+                :readonly="readonly"
+                :tabindex="readonly ? -1 : 0"
+                @keydown.native="onPostalCodeKeydown"
+                @paste.native="onPostalCodePaste"
+                @input="normalizePostalCode"
+              />
             </CCol>
           </CRow>
           <div v-if="!readonly" class="address-save-row">
@@ -933,13 +1025,45 @@ export default {
               variant="outline"
               size="sm"
               class="address-save-button"
+              :disabled="addressSaveDisabled"
               @click="$emit('save')"
             >
               {{ saveLabel }}
             </CButton>
           </div>
         </div>
-      `
+      `,
+      computed: {
+        addressSaveDisabled () {
+          return hasMissingRequiredAddressFields(this.address)
+        }
+      },
+      methods: {
+        normalizePostalCode (value) {
+          const digits = normalizePhoneDigits(optionValue(value))
+          if (this.address.postalCode !== digits) {
+            this.$set(this.address, 'postalCode', digits)
+          }
+        },
+        onPostalCodeKeydown (event) {
+          const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'Escape', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End']
+          if (!event || allowedKeys.includes(event.key) || event.ctrlKey || event.metaKey) return
+          if (!/^\d$/.test(event.key)) {
+            event.preventDefault()
+          }
+        },
+        onPostalCodePaste (event) {
+          if (!event || !event.clipboardData) return
+          const pastedDigits = normalizePhoneDigits(event.clipboardData.getData('text'))
+          event.preventDefault()
+          if (!pastedDigits) return
+          const input = event.target
+          const current = normalizePhoneDigits(this.address.postalCode)
+          const start = input && typeof input.selectionStart === 'number' ? input.selectionStart : current.length
+          const end = input && typeof input.selectionEnd === 'number' ? input.selectionEnd : start
+          this.$set(this.address, 'postalCode', `${current.slice(0, start)}${pastedDigits}${current.slice(end)}`)
+        }
+      }
     }
   },
   data () {
@@ -951,9 +1075,10 @@ export default {
       addressEditing: {
         homeAddress: false,
         currentAddress: false,
-        workAddress: false
+        workAddress: false,
+        certificateDeliveryAddress: true
       },
-      schoolProgramCatalog: [],
+      schoolProgramCatalog: SCHOOL_PROGRAM_CATALOG.slice(),
       lastRegistrationLookupEmail: '',
       loadedDraftStorageKey: '',
       currentRegistrationId: '',
@@ -972,6 +1097,9 @@ export default {
     },
     authStudentCode () {
       return profileStudentCode(this.currentProfile)
+    },
+    graduateInitialRecord () {
+      return findGraduateInitialRecord(this.authStudentCode, this.authEmail)
     },
     draftStorageKey () {
       const profile = this.currentProfile || {}
@@ -1023,6 +1151,23 @@ export default {
     addressSaveLabel () {
       return this.isEnglishLocale ? 'Save' : 'บันทึก'
     },
+    questionnaireSampleTitle () {
+      return this.isEnglishLocale ? 'Questionnaire' : 'แบบสอบถาม'
+    },
+    questionnaireSampleQuestion () {
+      return this.isEnglishLocale ? 'Current employment status' : 'สถานะการทำงานปัจจุบัน'
+    },
+    questionnaireSampleNoteLabel () {
+      return this.isEnglishLocale ? 'Additional note' : 'หมายเหตุเพิ่มเติม'
+    },
+    questionnaireSampleOptions () {
+      return [
+        { label: this.isEnglishLocale ? 'Please specify' : 'กรุณาระบุ', value: '' },
+        { label: this.isEnglishLocale ? 'Employed' : 'ทำงานแล้ว', value: 'employed' },
+        { label: this.isEnglishLocale ? 'Not employed yet' : 'ยังไม่ได้ทำงาน', value: 'not-employed' },
+        { label: this.isEnglishLocale ? 'Continuing study' : 'ศึกษาต่อ', value: 'study' }
+      ]
+    },
     ceremonyStatusSelectLabel () {
       return this.isEnglishLocale ? 'Select status' : 'เลือกสถานะ'
     },
@@ -1037,6 +1182,12 @@ export default {
     summaryProgram () {
       return this.localizedProgramName(this.form.program)
     },
+    foodAllergySummaryLabel () {
+      const normalized = normalizeYesNo(this.form.hasFoodAllergy)
+      if (normalized === 'yes') return this.$t('graduation.options.yes')
+      if (normalized === 'no') return this.$t('graduation.options.no')
+      return '-'
+    },
     barcodeValue () {
       const base = [this.form.firstName, this.form.lastName, this.form.phone]
         .join('-')
@@ -1049,11 +1200,8 @@ export default {
       const fallbackSchools = catalogSchools.length ? [] : Object.keys(THAI_SCHOOL_PROGRAMS)
         .map(item => ({ school: item, labelTh: item, labelEn: item }))
       const schools = [...catalogSchools, ...fallbackSchools]
-      if (this.form.school && !schools.some(item => schoolComparableValue(item && item.school) === schoolComparableValue(this.form.school))) {
-        schools.push({ school: textValue(this.form.school), labelTh: textValue(this.form.school), labelEn: textValue(this.form.school) })
-      }
       return [
-        { label: '', value: '' },
+        { label: this.isEnglishLocale ? 'Please specify' : 'กรุณาระบุ', value: '' },
         ...schools
           .sort((left, right) => localizedCatalogLabel(left, left && left.school, this.isEnglishLocale).localeCompare(localizedCatalogLabel(right, right && right.school, this.isEnglishLocale), this.isEnglishLocale ? 'en' : 'th'))
           .map(item => ({
@@ -1069,13 +1217,10 @@ export default {
       ))
       const schoolKey = schoolKeyFor(this.form.school)
       const catalogPrograms = catalogItem && Array.isArray(catalogItem.programs) ? catalogItem.programs : []
-      const fallbackPrograms = catalogPrograms.length ? [] : (schoolKey ? THAI_SCHOOL_PROGRAMS[schoolKey].map(item => ({ program: item, labelTh: item, labelEn: item })) : [])
+      const fallbackPrograms = (catalogPrograms.length || this.schoolProgramCatalog.length) ? [] : (schoolKey ? THAI_SCHOOL_PROGRAMS[schoolKey].map(item => ({ program: item, labelTh: item, labelEn: item })) : [])
       const programs = [...catalogPrograms, ...fallbackPrograms]
-      if (this.form.program && !programs.some(item => normalizeOptionValue(item && item.program) === normalizeOptionValue(this.form.program))) {
-        programs.push({ program: textValue(this.form.program), labelTh: textValue(this.form.program), labelEn: textValue(this.form.program) })
-      }
       return [
-        { label: '', value: '' },
+        { label: this.isEnglishLocale ? 'Please specify' : 'กรุณาระบุ', value: '' },
         ...programs
           .sort((left, right) => localizedCatalogLabel(left, left && left.program, this.isEnglishLocale).localeCompare(localizedCatalogLabel(right, right && right.program, this.isEnglishLocale), this.isEnglishLocale ? 'en' : 'th'))
           .map(item => ({
@@ -1089,7 +1234,7 @@ export default {
     },
     ceremonyStatusOptions () {
       return [
-        { label: '', value: '' },
+        { label: this.isEnglishLocale ? 'Please specify' : 'กรุณาระบุ', value: '' },
         ...CEREMONY_STATUS_OPTIONS.map(item => ({
           label: `${item.value} - ${this.$t(`graduation.ceremonyStatus.${item.key}`)}`,
           value: item.value
@@ -1108,7 +1253,7 @@ export default {
     },
     ceremonyAssistanceTypeOptions () {
       return [
-        { label: '', value: '' },
+        { label: this.isEnglishLocale ? 'Please specify' : 'กรุณาระบุ', value: '' },
         ...CEREMONY_ASSISTANCE_TYPE_OPTIONS.map(item => ({
           label: `${item.value} - ${this.$t(`graduation.assistanceType.${item.key}`)}`,
           value: item.value
@@ -1133,12 +1278,15 @@ export default {
     requiresCertificateDelivery () {
       return ['50', '60'].includes(normalizeCeremonyStatus(this.form.ceremonyStatus))
     },
+    requiresFaceCheckIn () {
+      return FACE_CHECKIN_CEREMONY_STATUS_CODES.includes(normalizeCeremonyStatus(this.form.ceremonyStatus))
+    },
     requiresCertificateShipping () {
       return this.requiresCertificateDelivery && this.form.certificateDeliveryMethod === 'postal'
     },
     certificateDeliveryMethodOptions () {
       return [
-        { label: '', value: '' },
+        { label: this.isEnglishLocale ? 'Please specify' : 'กรุณาระบุ', value: '' },
         { label: this.$t('graduation.certificate.pickup'), value: 'pickup' },
         { label: this.$t('graduation.certificate.postal'), value: 'postal' }
       ]
@@ -1152,17 +1300,18 @@ export default {
       }))
     },
     requiredCompleted () {
-      const requiredFields = ['firstName', 'lastName', 'firstNamePronunciation', 'lastNamePronunciation', 'phone', 'school', 'program', 'ceremonyStatus']
-      let completed = requiredFields.filter(key => !!String(this.form[key] || '').trim()).length
-      if (this.requiresAssistanceType && this.form.ceremonyAssistanceType) completed += 1
-      if (this.requiresCertificateDelivery && this.form.certificateDeliveryMethod) completed += 1
-      if (this.requiresCertificateShipping && this.form.certificateShippingService) completed += 1
+      const requiredFields = ['firstName', 'lastName', 'firstNamePronunciation', 'lastNamePronunciation', 'phone', 'school', 'program', 'ceremonyStatus', 'questionnaireEmploymentStatus']
+      let completed = requiredFields.filter(key => !!meaningfulOptionValue(this.form[key])).length
+      if (this.requiresAssistanceType && meaningfulOptionValue(this.form.ceremonyAssistanceType)) completed += 1
+      if (this.requiresCertificateDelivery && meaningfulOptionValue(this.form.certificateDeliveryMethod)) completed += 1
+      if (this.requiresCertificateShipping && meaningfulOptionValue(this.form.certificateShippingService)) completed += 1
       if (this.requiresCertificateShipping && this.hasAnyAddressValue(this.form.certificateDeliveryAddress)) completed += 1
       if (this.requiresFoodAllergyNote && this.isValidFoodAllergyNote(this.form.foodAllergyNote)) completed += 1
       return completed
     },
     completionPercent () {
-      let requiredTotal = this.requiresAssistanceType ? 9 : 8
+      let requiredTotal = 9
+      if (this.requiresAssistanceType) requiredTotal += 1
       if (this.requiresCertificateDelivery) requiredTotal += 1
       if (this.requiresCertificateShipping) requiredTotal += 2
       if (this.requiresFoodAllergyNote) requiredTotal += 1
@@ -1187,25 +1336,32 @@ export default {
     foodAllergyNoteDisabled () {
       return !this.requiresFoodAllergyNote
     },
+    addressFieldsInvalid () {
+      return ADDRESS_SOURCE_KEYS.some(addressKey => this.hasMissingRequiredAddressFields(this.form[addressKey])) ||
+        (this.requiresCertificateShipping && this.hasMissingRequiredAddressFields(this.form.certificateDeliveryAddress))
+    },
+    saveButtonDisabled () {
+      return this.saving || this.addressFieldsInvalid
+    },
     validationErrors () {
       const requiredMessage = this.$t('graduation.messages.requiredField')
       const errors = {}
-      ;['firstName', 'lastName', 'firstNamePronunciation', 'lastNamePronunciation', 'phone', 'school', 'program', 'ceremonyStatus']
+      ;['firstName', 'lastName', 'firstNamePronunciation', 'lastNamePronunciation', 'phone', 'school', 'program', 'questionnaireEmploymentStatus', 'ceremonyStatus']
         .forEach(field => {
-          if (!textValue(this.form[field])) {
+          if (!meaningfulOptionValue(this.form[field])) {
             errors[field] = requiredMessage
           }
         })
-      if (this.requiresAssistanceType && !textValue(this.form.ceremonyAssistanceType)) {
+      if (this.requiresAssistanceType && !meaningfulOptionValue(this.form.ceremonyAssistanceType)) {
         errors.ceremonyAssistanceType = requiredMessage
       }
-      if (this.requiresCertificateDelivery && !this.form.certificateDeliveryMethod) {
+      if (this.requiresCertificateDelivery && !meaningfulOptionValue(this.form.certificateDeliveryMethod)) {
         errors.certificateDeliveryMethod = this.$t('graduation.messages.selectCertificateMethod')
       }
-      if (this.requiresCertificateShipping && !this.form.certificateShippingService) {
+      if (this.requiresCertificateShipping && !meaningfulOptionValue(this.form.certificateShippingService)) {
         errors.certificateShippingService = this.$t('graduation.messages.selectShippingService')
       }
-      if (this.requiresCertificateShipping && !this.hasAnyAddressValue(this.form.certificateDeliveryAddress)) {
+      if (this.requiresCertificateShipping && this.hasMissingRequiredAddressFields(this.form.certificateDeliveryAddress)) {
         errors.certificateDeliveryAddress = this.$t('graduation.messages.enterCertificateAddress')
       }
       if (this.foodAllergyNoteInvalid) {
@@ -1287,23 +1443,37 @@ export default {
         this.foodAllergyAlertShown = false
       }
     },
+    'form.questionnaireEmploymentStatus' () {
+      this.persistLocalDraft()
+    },
+    'form.questionnaireNote' () {
+      this.persistLocalDraft()
+    },
     'form.certificateDeliveryMethod' (next) {
       if (next !== 'postal') {
         this.form.certificateShippingService = ''
         this.form.certificateDeliveryAddress = emptyAddress()
+        this.$set(this.addressEditing, 'certificateDeliveryAddress', true)
+        return
       }
+      this.applyDefaultCertificateDeliveryAddress(true)
     }
   },
   methods: {
     isLockedField (field) {
+      if (field === 'firstName' || field === 'lastName') return true
       return !!(this.lockedFields && this.lockedFields[field])
     },
     applyFixedGraduateName () {
-      const studentCode = this.authStudentCode || normalizeStudentCode(this.currentRegistrationBarcodeValue)
-      const fixedName = GRADUATE_NAME_OVERRIDES[studentCode]
-      if (!fixedName) return
-      this.form.firstName = fixedName.firstName
-      this.form.lastName = fixedName.lastName
+      const initialDefaults = graduateInitialDefaults(this.graduateInitialRecord)
+      if (initialDefaults.firstName || initialDefaults.lastName) {
+        this.form.firstName = initialDefaults.firstName || ''
+        this.form.lastName = initialDefaults.lastName || ''
+        this.currentRegistrationBarcodeValue = initialDefaults.studentCode || this.currentRegistrationBarcodeValue
+        this.$set(this.lockedFields, 'firstName', 'profile')
+        this.$set(this.lockedFields, 'lastName', 'profile')
+        return
+      }
       this.$set(this.lockedFields, 'firstName', 'profile')
       this.$set(this.lockedFields, 'lastName', 'profile')
     },
@@ -1381,6 +1551,8 @@ export default {
       this.$set(this.addressEditing, addressKey, true)
     },
     saveAddressEdit (addressKey) {
+      if (this.hasMissingRequiredAddressFields(this.form[addressKey])) return
+      this.prepareAddressForSave(addressKey)
       this.$set(this.addressEditing, addressKey, false)
       this.persistLocalDraft()
     },
@@ -1388,7 +1560,8 @@ export default {
       this.addressEditing = {
         homeAddress: false,
         currentAddress: false,
-        workAddress: false
+        workAddress: false,
+        certificateDeliveryAddress: false
       }
     },
     normalizedAddress (address) {
@@ -1397,6 +1570,32 @@ export default {
         normalized[field] = textValue(address && address[field])
       })
       return normalized
+    },
+    hasMissingRequiredAddressFields (address) {
+      return hasMissingRequiredAddressFields(address)
+    },
+    addressValueForSave (address, field) {
+      const raw = String(address && address[field] != null ? address[field] : '').trim()
+      if (!raw) return '-'
+      if (field !== 'postalCode' || raw === '-') return raw
+      return normalizePhoneDigits(raw) || '-'
+    },
+    addressWithSaveDefaults (address) {
+      const normalized = emptyAddress()
+      ADDRESS_FIELD_KEYS.forEach(field => {
+        normalized[field] = this.addressValueForSave(address, field)
+      })
+      return normalized
+    },
+    prepareAddressForSave (addressKey) {
+      if (!this.form[addressKey]) return
+      this.$set(this.form, addressKey, this.addressWithSaveDefaults(this.form[addressKey]))
+    },
+    prepareAddressFieldsForSave () {
+      ADDRESS_SOURCE_KEYS.forEach(addressKey => this.prepareAddressForSave(addressKey))
+      if (this.requiresCertificateShipping) {
+        this.prepareAddressForSave('certificateDeliveryAddress')
+      }
     },
     addressTitle (addressKey) {
       const titles = {
@@ -1407,7 +1606,10 @@ export default {
       return titles[addressKey] || ''
     },
     addressSourceOptions (targetKey) {
-      const sourceOptions = ADDRESS_COPY_SOURCE_KEYS
+      const sourceKeys = targetKey === 'certificateDeliveryAddress'
+        ? CERTIFICATE_ADDRESS_COPY_SOURCE_KEYS
+        : ADDRESS_COPY_SOURCE_KEYS
+      const sourceOptions = sourceKeys
         .filter(addressKey => addressKey !== targetKey && this.hasAnyAddressValue(this.form[addressKey]))
         .map(addressKey => ({
           value: addressKey,
@@ -1436,9 +1638,16 @@ export default {
       if (!this.hasAnyAddressValue(address)) return
       this.$set(this.form, targetKey, Object.assign(emptyAddress(), address))
       if (Object.prototype.hasOwnProperty.call(this.addressEditing, targetKey)) {
-        this.$set(this.addressEditing, targetKey, false)
+        this.$set(this.addressEditing, targetKey, true)
       }
-      this.persistLocalDraft()
+    },
+    applyDefaultCertificateDeliveryAddress (force = false) {
+      if (this.form.certificateDeliveryMethod !== 'postal') return
+      const currentAddress = this.normalizedAddress(this.form.currentAddress)
+      if (!this.hasAnyAddressValue(currentAddress)) return
+      if (!force && this.hasAnyAddressValue(this.form.certificateDeliveryAddress)) return
+      this.$set(this.form, 'certificateDeliveryAddress', Object.assign(emptyAddress(), currentAddress))
+      this.$set(this.addressEditing, 'certificateDeliveryAddress', false)
     },
     applyAddressDefaults (registration) {
       const addressKeys = ['homeAddress', 'currentAddress', 'workAddress']
@@ -1458,39 +1667,14 @@ export default {
         this.$set(this.form, addressKey, address)
         this.$set(this.addressEditing, addressKey, false)
       })
+      this.applyDefaultCertificateDeliveryAddress(false)
     },
     registrationSearchTerms () {
       const studentCode = this.authStudentCode || normalizeStudentCode(this.currentRegistrationBarcodeValue)
       if (studentCode) return [studentCode]
       const email = this.authEmail || normalizeEmailText(this.form.email)
       if (email) return [email]
-      return [
-        this.form.phone,
-        this.form.barcodeValue,
-        this.form.firstName,
-        this.form.lastName
-      ]
-        .map(item => textValue(item).toLowerCase())
-        .filter((item, index, list) => item && list.indexOf(item) === index)
-    },
-    registrationMatchScore (registration) {
-      const studentCode = this.authStudentCode || normalizeStudentCode(this.currentRegistrationBarcodeValue)
-      const email = this.authEmail || normalizeEmailText(this.form.email)
-      const phone = textValue(this.form.phone)
-      const firstName = textValue(this.form.firstName)
-      const lastName = textValue(this.form.lastName)
-      let score = 0
-      if (studentCode) return normalizeStudentCode(registration && registration.barcodeValue) === studentCode ? 120 : 0
-      if (email) return normalizeEmailText(registration.email) === email ? 100 : 0
-      if (phone && textValue(registration.phone) === phone) score += 80
-      if (firstName && textValue(registration.firstName) === firstName) score += 30
-      if (lastName && textValue(registration.lastName) === lastName) score += 30
-      return score
-    },
-    bestRegistrationRow (rows) {
-      return rows
-        .map(row => ({ row, score: this.registrationMatchScore(row) }))
-        .sort((left, right) => right.score - left.score)[0]
+      return []
     },
     findCatalogSchool (school) {
       const key = schoolComparableValue(school)
@@ -1517,30 +1701,32 @@ export default {
       this.form.programEnglish = textValue(programItem && (programItem.programEnglish || programItem.labelEn)) || textValue(this.form.programEnglish)
     },
     async fetchRegistrationOptions () {
-      try {
-        const response = await api.graduateRegistrations('options')
-        const data = response && response.data && response.data.data ? response.data.data : {}
-        const schools = Array.isArray(data.schools) ? data.schools : []
-        this.schoolProgramCatalog = schools
-          .map(item => ({
-            school: textValue(item && item.school),
-            schoolEnglish: textValue(item && item.schoolEnglish),
-            labelTh: textValue(item && item.labelTh) || textValue(item && item.school),
-            labelEn: textValue(item && item.labelEn) || textValue(item && item.schoolEnglish) || textValue(item && item.school),
-            programs: (Array.isArray(item && item.programs) ? item.programs : [])
-              .map(program => ({
-                program: textValue(program && program.program !== undefined ? program.program : program),
-                programEnglish: textValue(program && program.programEnglish),
-                labelTh: textValue(program && program.labelTh) || textValue(program && program.program !== undefined ? program.program : program),
-                labelEn: textValue(program && program.labelEn) || textValue(program && program.programEnglish) || textValue(program && program.program !== undefined ? program.program : program)
-              }))
-              .filter(program => program.program)
-          }))
-          .filter(item => item.school)
-        this.syncCatalogLanguageFields()
-      } catch (error) {
-        this.schoolProgramCatalog = []
-      }
+      this.schoolProgramCatalog = SCHOOL_PROGRAM_CATALOG.slice()
+      this.syncCatalogLanguageFields()
+    },
+    mergeSchoolProgramCatalog () {
+      const merged = []
+      Array.prototype.slice.call(arguments).forEach(source => {
+        const schools = Array.isArray(source) ? source : []
+        schools.forEach(item => {
+          const school = textValue(item && item.school)
+          if (!school) return
+          let target = merged.find(existing => schoolComparableValue(existing.school) === schoolComparableValue(school))
+          if (!target) {
+            target = Object.assign({}, item, { programs: [] })
+            merged.push(target)
+          }
+          const programs = Array.isArray(item && item.programs) ? item.programs : []
+          programs.forEach(program => {
+            const programName = textValue(program && program.program)
+            if (!programName) return
+            if (!target.programs.some(existing => normalizeOptionValue(existing.program) === normalizeOptionValue(programName))) {
+              target.programs.push(Object.assign({}, program, { program: programName }))
+            }
+          })
+        })
+      })
+      return merged
     },
     applyRegistrationDefaults (registration) {
       const school = textValue(registration && registration.school) || normalizeSchoolName(registration && registration.school)
@@ -1554,23 +1740,31 @@ export default {
         school,
         schoolEnglish: textValue(registration && registration.schoolEnglish),
         program: normalizeProgramName(school, registration && registration.program),
-        programEnglish: textValue(registration && registration.programEnglish)
+        programEnglish: textValue(registration && registration.programEnglish),
+        questionnaireEmploymentStatus: meaningfulOptionValue(registration && registration.questionnaireEmploymentStatus),
+        questionnaireNote: textValue(registration && registration.questionnaireNote)
       }, { source: 'registration' })
+      this.form.questionnaireEmploymentStatus = meaningfulOptionValue(registration && registration.questionnaireEmploymentStatus)
+      this.form.questionnaireNote = textValue(registration && registration.questionnaireNote)
       this.applyAddressDefaults(registration)
       this.applyFixedGraduateName()
     },
     applyDefaults (defaults, options = {}) {
       const source = options.source || 'profile'
       ;['firstName', 'lastName', 'phone', 'email'].forEach(field => {
-        if (['firstName', 'lastName'].includes(field) && source !== 'profile' && this.lockedFields[field] === 'profile') {
+        if (['firstName', 'lastName'].includes(field) && source === 'profile' && this.lockedFields[field] && this.lockedFields[field] !== 'profile') {
           return
         }
         if (defaults[field]) {
           this.form[field] = defaults[field]
           this.$set(this.lockedFields, field, source)
-        } else if (!textValue(this.form[field])) {
-          this.form[field] = ''
-          this.$delete(this.lockedFields, field)
+        } else {
+          if (source === 'profile' && field !== 'firstName' && field !== 'lastName') {
+            this.$delete(this.lockedFields, field)
+          }
+          if (!textValue(this.form[field])) {
+            this.form[field] = ''
+          }
         }
       })
       this.syncPhonePartsFromPhone(this.form.phone)
@@ -1594,7 +1788,12 @@ export default {
       }
     },
     applyProfileDefaults () {
-      const defaults = profileRegistrationDefaults(this.currentProfile)
+      const defaults = Object.assign(
+        {},
+        profileRegistrationDefaults(this.currentProfile),
+        graduateInitialDefaults(this.graduateInitialRecord)
+      )
+      this.lockedFields = {}
       this.applyDefaults(defaults, { source: 'profile' })
       this.applyProfileAddressDefaults()
       this.applyFixedGraduateName()
@@ -1621,23 +1820,7 @@ export default {
           this.applyRegistrationDefaults(defaultRow)
           return
         }
-        if (studentCode) return
-        if (authEmail) return
         if (!searchTerms.length) return
-        const responses = await Promise.all(searchTerms.map(term => (
-          api.graduateRegistrations('list', { q: term, limit: 20 })
-        )))
-        const rows = responses.reduce((items, response) => {
-          const data = response && response.data && response.data.data ? response.data.data : {}
-          const responseRows = Array.isArray(data.rows) ? data.rows : []
-          responseRows.forEach(row => {
-            if (row && row._id && !items.some(item => item._id === row._id)) items.push(row)
-          })
-          return items
-        }, [])
-        const best = this.bestRegistrationRow(rows)
-        if (!best || best.score <= 0) return
-        this.applyRegistrationDefaults(best.row)
       } catch (error) {
         // Users can still fill missing fields manually when registry lookup is unavailable.
       }
@@ -1689,7 +1872,10 @@ export default {
       if (method !== 'postal') {
         this.form.certificateShippingService = ''
         this.form.certificateDeliveryAddress = emptyAddress()
+        this.$set(this.addressEditing, 'certificateDeliveryAddress', true)
+        return
       }
+      this.applyDefaultCertificateDeliveryAddress(true)
     },
     selectCertificateShippingService (value) {
       this.form.certificateShippingService = optionValue(value)
@@ -1756,6 +1942,7 @@ export default {
       const hasFoodAllergy = normalizeYesNo(this.form.hasFoodAllergy)
       const schoolItem = this.findCatalogSchool(this.form.school)
       const programItem = this.findCatalogProgram(this.form.school, this.form.program)
+      const initialDefaults = graduateInitialDefaults(this.graduateInitialRecord)
       return Object.assign({}, this.form, {
         namePronunciation: this.namePronunciation,
         phone: this.composedPhone,
@@ -1764,9 +1951,11 @@ export default {
         schoolEnglish: textValue(schoolItem && (schoolItem.schoolEnglish || schoolItem.labelEn)) || textValue(this.form.schoolEnglish),
         program: textValue(this.form.program),
         programEnglish: textValue(programItem && (programItem.programEnglish || programItem.labelEn)) || textValue(this.form.programEnglish),
+        questionnaireEmploymentStatus: meaningfulOptionValue(this.form.questionnaireEmploymentStatus),
+        questionnaireNote: textValue(this.form.questionnaireNote),
         hasFoodAllergy,
         foodAllergyNote: hasFoodAllergy === 'yes' ? this.form.foodAllergyNote : '',
-        barcodeValue: this.currentRegistrationBarcodeValue || this.authStudentCode || this.barcodeValue
+        barcodeValue: this.currentRegistrationBarcodeValue || initialDefaults.studentCode || this.authStudentCode || this.barcodeValue
       })
     },
     persistLocalDraft (savedRegistration) {
@@ -1775,7 +1964,7 @@ export default {
         : this.currentRegistrationId
       const savedBarcode = savedRegistration && savedRegistration.barcodeValue
         ? textValue(savedRegistration.barcodeValue)
-        : (this.currentRegistrationBarcodeValue || this.authStudentCode || this.barcodeValue)
+        : (this.currentRegistrationBarcodeValue || normalizeStudentCode(this.graduateInitialRecord && this.graduateInitialRecord.studentCode) || this.authStudentCode || this.barcodeValue)
       this.currentRegistrationId = savedId
       this.currentRegistrationBarcodeValue = savedBarcode
       const payload = {
@@ -1783,7 +1972,9 @@ export default {
           phone: this.composedPhone,
           email: this.authEmail || normalizeEmailText(this.form.email),
           school: textValue(this.form.school),
-          program: textValue(this.form.program)
+          program: textValue(this.form.program),
+          questionnaireEmploymentStatus: meaningfulOptionValue(this.form.questionnaireEmploymentStatus),
+          questionnaireNote: textValue(this.form.questionnaireNote)
         }),
         barcodeValue: savedBarcode,
         currentRegistrationId: savedId,
@@ -1798,15 +1989,30 @@ export default {
       if (!this.validateCertificateDelivery()) {
         return null
       }
+      if (this.addressFieldsInvalid) {
+        return null
+      }
+      this.prepareAddressFieldsForSave()
       this.saving = true
       try {
         const payload = this.registrationPayload()
         const currentId = textValue(this.currentRegistrationId)
-        const response = currentId
-          ? await api.graduateRegistrations('update', Object.assign({ _id: currentId }, payload))
-          : await api.graduateRegistrations('create', payload)
+        let response = null
+        if (currentId) {
+          try {
+            response = await api.graduateRegistrations('update', Object.assign({ _id: currentId }, payload))
+          } catch (error) {
+            const status = error && error.response && error.response.status
+            if (status !== 404) throw error
+            this.currentRegistrationId = ''
+            response = await api.graduateRegistrations('create', payload)
+          }
+        } else {
+          response = await api.graduateRegistrations('create', payload)
+        }
         const saved = response && response.data && response.data.data ? response.data.data : null
         this.persistLocalDraft(saved)
+        this.resetAddressEditing()
         this.validationAttempted = false
         notifySuccess(this.$store, this.$t('graduation.messages.saveSuccess'))
         return saved
@@ -1826,6 +2032,7 @@ export default {
         const raw = window.localStorage.getItem(storageKey)
         if (!raw) {
           this.form = cloneForm()
+          this.lockedFields = {}
           this.syncPhonePartsFromPhone('')
           this.applyFixedGraduateName()
           this.currentRegistrationId = ''
@@ -1849,6 +2056,8 @@ export default {
         restored.schoolEnglish = textValue(restored.schoolEnglish)
         restored.program = textValue(restored.program)
         restored.programEnglish = textValue(restored.programEnglish)
+        restored.questionnaireEmploymentStatus = meaningfulOptionValue(restored.questionnaireEmploymentStatus)
+        restored.questionnaireNote = textValue(restored.questionnaireNote)
         const restoredCeremonyRaw = normalizeCode(restored.ceremonyStatus)
         if (CEREMONY_ASSISTANCE_TYPE_OPTIONS.some(item => item.value === restoredCeremonyRaw)) {
           restored.ceremonyAssistanceType = restoredCeremonyRaw
@@ -1886,6 +2095,7 @@ export default {
         return
       }
       this.form = cloneForm()
+      this.lockedFields = {}
       this.syncPhonePartsFromPhone('')
       this.applyFixedGraduateName()
       this.currentRegistrationId = ''
@@ -1906,7 +2116,9 @@ export default {
       } catch (error) {
         return
       }
-      this.$router.push('/graduation/face-checkin')
+      if (this.requiresFaceCheckIn) {
+        this.$router.push('/graduation/face-checkin')
+      }
     }
   }
 }
@@ -1989,6 +2201,11 @@ export default {
   font-weight: 900;
 }
 .required-field ::v-deep label::after {
+  content: " *";
+  color: #e55353;
+  font-weight: 900;
+}
+::v-deep .address-required-field label::after {
   content: " *";
   color: #e55353;
   font-weight: 900;
@@ -2247,6 +2464,16 @@ export default {
   border-color: #d1d5db;
   pointer-events: none;
 }
+.questionnaire-sample-card {
+  border-color: #e5e7eb;
+  background: #fff;
+}
+.questionnaire-sample-heading {
+  margin-bottom: 12px;
+}
+.questionnaire-sample-heading h2 {
+  font-size: 18px;
+}
 .certificate-delivery-block {
   margin: 8px 0 18px;
   padding: 16px;
@@ -2402,51 +2629,57 @@ export default {
   background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
   box-shadow: 0 14px 32px rgba(15, 23, 42, 0.12);
 }
+.summary-card .card-body {
+  padding: 1rem;
+}
 .summary-card::before {
   display: block;
-  height: 4px;
-  margin: -1.25rem -1.25rem 18px;
+  height: 3px;
+  margin: -1rem -1rem 8px;
   background: linear-gradient(90deg, #8c1515, #c9a227);
   content: "";
 }
 .summary-heading {
   align-items: flex-start;
-  margin-bottom: 18px;
+  margin-bottom: 10px;
 }
 .summary-heading > div {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 .summary-heading h2 {
-  font-size: 20px;
+  font-size: 18px;
 }
 .summary-heading__icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
   color: #8c1515;
   background: #fff1f1;
 }
 .summary-badge {
   flex: 0 0 auto;
-  margin-top: 6px;
-  padding: 6px 10px;
+  margin-top: 2px;
+  padding: 4px 9px;
   border-radius: 999px;
   font-weight: 700;
 }
 .summary-list {
   display: grid;
-  gap: 10px;
+  gap: 4px;
 }
 .summary-list div {
   display: grid;
-  gap: 4px;
-  padding: 11px 0;
+  gap: 3px;
+  padding: 6px 0;
   border-bottom: 1px solid #eef2f7;
+}
+.summary-list div:last-child {
+  border-bottom: 0;
 }
 .summary-list span {
   color: #6b7280;
@@ -2454,14 +2687,15 @@ export default {
 }
 .summary-list strong {
   color: #111827;
+  font-size: 15px;
   overflow-wrap: anywhere;
-  line-height: 1.45;
+  line-height: 1.3;
 }
 .summary-progress-label {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 18px;
+  margin-top: 10px;
   color: #6b7280;
   font-size: 12px;
 }
@@ -2475,9 +2709,9 @@ export default {
   font-weight: 700;
 }
 .completion-meter {
-  height: 10px;
+  height: 8px;
   overflow: hidden;
-  margin-top: 8px;
+  margin-top: 6px;
   border-radius: 999px;
   background: #e5e7eb;
 }
@@ -2489,14 +2723,14 @@ export default {
 }
 .summary-actions {
   display: flex;
-  margin-top: 20px;
+  margin-top: 12px;
 }
 .summary-save-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 46px;
+  min-height: 40px;
   border: 0;
   border-radius: 8px;
   background: #8c1515;

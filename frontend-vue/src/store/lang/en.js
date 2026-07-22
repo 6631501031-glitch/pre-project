@@ -865,8 +865,43 @@ const en = {
 
 en.graduation = {
     nav: {
-        selfRegistration: "Graduate questionnaire",
-        registrationAdmin: "Graduate registration data"
+        selfRegistration: "Student intention request system",
+        registrationAdmin: "Graduate registration data",
+        checkinDashboard: "Check-in dashboard"
+    },
+    checkin: {
+        eyebrow: "Check-in Dashboard",
+        title: "Graduate Check-in Dashboard",
+        subtitle: "Overview for rehearsal and ceremony days. Track registrations, data readiness, and graduates awaiting on-site check-in.",
+        actions: { refresh: "Refresh", openCheckin: "Open check-in", checkin: "Check in" },
+        modes: {
+            rehearsal: { label: "Rehearsal day", note: "Review the roster, test check-in, and verify data readiness." },
+            ceremony: { label: "Ceremony day", note: "Verify identities and track graduates at the venue." }
+        },
+        metrics: {
+            total: "Total", totalHint: "Registered graduates",
+            checked: "Checked in", checkedHint: "{rate}% in {mode}",
+            pending: "Pending", pendingHint: "Estimated from the full roster",
+            review: "Needs review", reviewHint: "Data or verification requires attention"
+        },
+        progress: {
+            checkedFrom: "Checked in {total} graduates",
+            pendingReview: "Pending {pending} / Review {review}"
+        },
+        roster: {
+            title: "Check-in roster",
+            subtitle: "Search by name, phone, email, school, or program.",
+            searchPlaceholder: "Search roster",
+            graduate: "Graduate",
+            schoolProgram: "School / Program",
+            loading: "Loading data",
+            empty: "No records match your search"
+        },
+        pagination: {
+            showing: "Showing", ofNames: "of {total} graduates",
+            previous: "Previous", page: "Page", next: "Next"
+        },
+        loadError: "Unable to load check-in data."
     },
     fields: {
         firstName: "First name",
@@ -945,7 +980,7 @@ en.graduation = {
         method: "Certificate receiving method",
         methodPlaceholder: "Select certificate receiving method",
         pickup: "Pick up in person",
-        postal: "Send by post to a new address",
+        postal: "Send by post",
         shippingService: "Shipping service",
         shippingPlaceholder: "Select shipping service",
         deliveryAddress: "Certificate delivery address",
@@ -970,9 +1005,9 @@ en.graduation = {
         }
     },
     self: {
-        eyebrow: "Graduate Questionnaire",
-        title: "Graduate questionnaire",
-        subtitle: "Fill in graduate information for name verification and save the questionnaire data.",
+        eyebrow: "Student intention request system",
+        title: "Student intention request system",
+        subtitle: "Submit an intention request and complete the questionnaire.",
         sections: {
             name: "Announcement name",
             school: "School and program",
@@ -994,7 +1029,7 @@ en.graduation = {
         eyebrow: "Graduation Registration Admin",
         title: "Graduate registration data",
         subtitle: "Review graduate questionnaire data saved in MongoDB.",
-        searchPlaceholder: "Search name, phone, email, barcode",
+        searchPlaceholder: "Search name, phone, email",
         loading: "Loading data",
         empty: "No registration data",
         detailsTitle: "Registration details",

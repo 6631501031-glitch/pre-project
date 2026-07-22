@@ -10,9 +10,9 @@ const Page404 = () => import('@/views/pages/Page404')
 const Page500 = () => import('@/views/pages/Page500')
 const Login = () => import('@/views/pages/Login')
 const GRADUATIONSYSTEMUSINGFACERECOGNITIONGRADUATIONSYSTEMUSINGFACERECOGNITIONRegistry = () => import('@/projects/views/graduationsystemusingfacerecognition/GRADUATIONSYSTEMUSINGFACERECOGNITIONGRADUATIONSYSTEMUSINGFACERECOGNITIONRegistry')
-const GraduationAdminWorkspace = () => import('@/projects/views/graduation/GraduationAdminWorkspace')
 const GraduateSelfRegistration = () => import('@/projects/views/graduation/GraduateSelfRegistration')
 const GraduateRegistrationAdmin = () => import('@/projects/views/graduation/GraduateRegistrationAdmin')
+const GraduateCheckInDashboard = () => import('@/projects/views/graduation/GraduateCheckInDashboard')
 const GraduateFaceCheckIn = () => import('@/projects/views/graduation/GraduateFaceCheckIn')
 const AccountDirectory = () => import('@/projects/views/accounts/Management')
 const BusinessOperations = () => import('@/projects/views/operations/BusinessOperations')
@@ -65,16 +65,16 @@ const router = new Router({
           component: GraduateSelfRegistration
         },
         {
-          path: 'graduation/admin-workspace',
-          name: 'Graduation Admin Workspace',
-          meta: { permission: { path: '/graduation-system-using-face-recognition/registry', action: 'view' } },
-          component: GraduationAdminWorkspace
-        },
-        {
           path: 'graduation/registrations',
           name: 'Graduate Registration Admin',
           meta: { permission: { path: '/graduation-system-using-face-recognition/registry', action: 'view' } },
           component: GraduateRegistrationAdmin
+        },
+        {
+          path: 'graduation/checkin-dashboard',
+          name: 'Graduate Check-in Dashboard',
+          meta: { permission: { path: '/graduation-system-using-face-recognition/registry', action: 'view' } },
+          component: GraduateCheckInDashboard
         },
         {
           path: 'graduation/face-checkin',
