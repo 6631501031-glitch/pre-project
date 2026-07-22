@@ -33,9 +33,9 @@ export default function buildNav (t) {
         },
         {
           _name: 'CSidebarNavItem',
-          name: 'ศูนย์ควบคุมงานรับปริญญา',
-          to: '/graduation/admin-workspace',
-          icon: 'cil-clipboard',
+          name: t('graduation.nav.checkinDashboard'),
+          to: '/graduation/checkin-dashboard',
+          icon: 'cil-calendar-check',
           permission: { path: '/graduation-system-using-face-recognition/registry', action: 'view' }
         },
         {

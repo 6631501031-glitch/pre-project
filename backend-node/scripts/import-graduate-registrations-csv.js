@@ -177,6 +177,23 @@ function readAddress(row, headerIndex, prefix) {
   return address;
 }
 
+function ceremonyStatusLabel(value) {
+  const labels = {
+    1: 'เข้ารับพระราชทานปริญญาบัตร',
+    2: 'ไม่เข้ารับพระราชทานปริญญาบัตร แต่เข้าร่วมการถ่ายรูปหมู่สำนักวิชา',
+    3: 'ไม่เข้ารับพระราชทานปริญญาบัตร',
+    10: 'เข้ารับพระราชทานปริญญาบัตร',
+    20: 'เข้ารับ ขอความช่วยเหลือกรณีพิเศษ',
+    30: 'เข้ารับ เป็นพระภิกษุ',
+    40: 'เข้ารับ ได้รับยศเป็นว่าที่ ร.ต / ว่าที่ ร.ต. หญิง',
+    50: 'ไม่เข้ารับพระราชทานปริญญาบัตร แต่เข้าร่วมการถ่ายรูปหมู่กับสำนักวิชา',
+    60: 'ไม่เข้ารับพระราชทานปริญญาบัตร และไม่เข้าร่วมการถ่ายรูปหมู่กับสำนักวิชา',
+    70: 'ขอเลื่อนการเข้ารับพระราชทานปริญญาบัตรเป็นปีการศึกษา 2564',
+    80: 'ไม่ได้ดำเนินการลงทะเบียนแจ้งการเข้ารับปริญญา'
+  };
+  return labels[String(value || '').trim()] || null;
+}
+
 function payloadFromRow(row, headerIndex) {
   const payload = {};
   Object.keys(FIELD_ALIASES).forEach(function (field) {
@@ -192,6 +209,7 @@ function payloadFromRow(row, headerIndex) {
   payload.ceremonyStatus = payload.ceremonyStatus ? cleanCode(payload.ceremonyStatus) : null;
   payload.ceremonyAssistanceType = payload.ceremonyAssistanceType ? cleanCode(payload.ceremonyAssistanceType) : null;
   if (payload.ceremonyAssistanceType && !payload.ceremonyStatus) payload.ceremonyStatus = '20';
+  payload.ceremonyStatusLabel = ceremonyStatusLabel(payload.ceremonyStatus);
   if (payload.ceremonyStatus !== '20') payload.ceremonyAssistanceType = null;
   payload.hasFoodAllergy = cleanYesNo(payload.hasFoodAllergy, payload.foodAllergyNote);
   if (payload.hasFoodAllergy !== 'yes') payload.foodAllergyNote = null;

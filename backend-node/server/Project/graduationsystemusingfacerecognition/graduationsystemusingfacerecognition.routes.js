@@ -79,6 +79,14 @@ router.put('/registrations/:id', canViewRegistry, async function (request, respo
   }
 });
 
+router.put('/registrations/:id/admin-status', canViewRegistry, async function (request, response) {
+  try {
+    return ok(response, await graduateRegistration.updateAdminStatus(request.params.id, request.body || {}, request));
+  } catch (error) {
+    return fail(response, error);
+  }
+});
+
 router.delete('/registrations/:id', canDeleteRegistry, async function (request, response) {
   try {
     return ok(response, await graduateRegistration.remove(request.params.id));

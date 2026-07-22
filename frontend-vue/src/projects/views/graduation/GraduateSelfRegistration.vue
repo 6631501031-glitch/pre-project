@@ -1752,7 +1752,7 @@ export default {
     applyDefaults (defaults, options = {}) {
       const source = options.source || 'profile'
       ;['firstName', 'lastName', 'phone', 'email'].forEach(field => {
-        if (['firstName', 'lastName'].includes(field) && source !== 'profile' && this.lockedFields[field] === 'profile') {
+        if (['firstName', 'lastName'].includes(field) && source === 'profile' && this.lockedFields[field] && this.lockedFields[field] !== 'profile') {
           return
         }
         if (defaults[field]) {

@@ -338,6 +338,8 @@ export default {
         return instance.post('/api/v1/graduationsystemusingfacerecognition/registrations', data || {});
       case 'update':
         return instance.put(`/api/v1/graduationsystemusingfacerecognition/registrations/${data && (data.id || data._id)}`, data || {});
+      case 'update-status':
+        return instance.put(`/api/v1/graduationsystemusingfacerecognition/registrations/${data && (data.id || data._id)}/admin-status`, data || {});
       case 'delete':
         return instance.delete(`/api/v1/graduationsystemusingfacerecognition/registrations/${data && (data.id || data._id)}`);
       default:

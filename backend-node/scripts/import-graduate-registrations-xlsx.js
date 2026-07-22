@@ -154,6 +154,19 @@ function hasAnyAddressValue(address) {
   });
 }
 
+function ceremonyStatusLabel(value) {
+  const labels = {
+    10: 'เข้ารับพระราชทานปริญญาบัตร',
+    20: 'เข้ารับ ขอความช่วยเหลือกรณีพิเศษ',
+    30: 'เข้ารับ เป็นพระภิกษุ',
+    40: 'เข้ารับ ได้รับยศเป็นว่าที่ ร.ต / ว่าที่ ร.ต. หญิง',
+    50: 'ไม่เข้ารับพระราชทานปริญญาบัตร แต่เข้าร่วมการถ่ายรูปหมู่กับสำนักวิชา',
+    60: 'ไม่เข้ารับพระราชทานปริญญาบัตร และไม่เข้าร่วมการถ่ายรูปหมู่กับสำนักวิชา',
+    70: 'ขอเลื่อนการเข้ารับพระราชทานปริญญาบัตรเป็นปีการศึกษา 2564'
+  };
+  return labels[String(value || '').trim()] || null;
+}
+
 function buildPayload(row) {
   const firstNameEnglish = readCell(row, 'firstNameEnglish');
   const lastNameEnglish = readCell(row, 'lastNameEnglish');
@@ -178,7 +191,8 @@ function buildPayload(row) {
     homeAddress: homeAddress,
     currentAddress: currentAddress,
     workAddress: {},
-    ceremonyStatus: null,
+    ceremonyStatus: '10',
+    ceremonyStatusLabel: ceremonyStatusLabel('10'),
     ceremonyAssistanceType: null,
     ceremonyStatusNote: null,
     certificateDeliveryMethod: null,
@@ -186,6 +200,7 @@ function buildPayload(row) {
     certificateDeliveryAddress: hasAnyAddressValue(currentAddress) ? currentAddress : {},
     hasFoodAllergy: 'no',
     foodAllergyNote: null,
+    studentCode: readCell(row, 'studentId'),
     barcodeValue: readCell(row, 'studentId'),
     create: {
       by: null,
