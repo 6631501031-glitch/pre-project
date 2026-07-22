@@ -16,6 +16,7 @@
     "import:graduate-csv:local": "node -r dotenv/config scripts/import-graduate-registrations-csv.js dotenv_config_path=.env.local",
     "import:graduate-xlsx": "node -r dotenv/config scripts/import-graduate-registrations-xlsx.js",
     "import:graduate-xlsx:local": "node -r dotenv/config scripts/import-graduate-registrations-xlsx.js dotenv_config_path=.env.local",
+    "backfill:graduate-status-labels:local": "node -r dotenv/config scripts/backfill-graduate-ceremony-status-labels.js dotenv_config_path=.env.local",
     "init:core": "node -r dotenv/config scripts/init-graduationsystemusingfacerecognition-core.js",
     "bootstrap": "npm run bootstrap:iam",
     "bootstrap:local": "npm run bootstrap:iam:local",
