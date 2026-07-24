@@ -54,6 +54,10 @@ export default {
     permissionLoaded() {
       return this.$store.getters['security/loaded']
     },
+    isStudentLogin() {
+      const profile = this.$store.getters['auth/profile'] || {}
+      return !!String(profile.studentCode || profile.barcodeValue || '').replace(/\D/g, '')
+    },
     navs() {
       this.$i18n.locale
       const navConfig = buildNav(this.$t.bind(this))
@@ -132,6 +136,7 @@ export default {
 
       const filtered = items.reduce((result, item) => {
         if (!item || typeof item !== 'object') return result
+        if (item.adminOnly && this.isStudentLogin) return result
 
         if (item._name === 'CSidebarNavTitle') {
           result.push({ ...item })

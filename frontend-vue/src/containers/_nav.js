@@ -15,14 +15,16 @@ export default function buildNav (t) {
           name: t('graduation.nav.registrationAdmin'),
           to: '/graduation/registrations',
           icon: 'cil-list-rich',
-          unrestricted: true
+          unrestricted: true,
+          adminOnly: true
         },
         {
           _name: 'CSidebarNavItem',
           name: t('graduation.nav.checkinDashboard'),
           to: '/graduation/checkin-dashboard',
           icon: 'cil-calendar-check',
-          unrestricted: true
+          unrestricted: true,
+          adminOnly: true
         }
       ]
     }
