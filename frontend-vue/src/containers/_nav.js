@@ -22,7 +22,13 @@ export default function buildNav (t) {
           name: t('graduation.nav.selfRegistration'),
           to: '/graduation/register',
           icon: 'cil-badge',
-          permission: { path: '/graduation-system-using-face-recognition/registry', action: 'view' }
+          permission: {
+            paths: [
+              '/graduation/register',
+              '/graduation-system-using-face-recognition/registry'
+            ],
+            action: 'view'
+          }
         },
         {
           _name: 'CSidebarNavItem',

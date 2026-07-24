@@ -61,7 +61,15 @@ const router = new Router({
         {
           path: 'graduation/register',
           name: 'Graduate Self Registration',
-          meta: { permission: { path: '/graduation/register', action: 'view' } },
+          meta: {
+            permission: {
+              paths: [
+                '/graduation/register',
+                '/graduation-system-using-face-recognition/registry'
+              ],
+              action: 'view'
+            }
+          },
           component: GraduateSelfRegistration
         },
         {
