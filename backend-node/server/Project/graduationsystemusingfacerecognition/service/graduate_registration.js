@@ -535,6 +535,17 @@ exports.create = async function create(body, request) {
   return created.toObject();
 };
 
+exports.isOwnedByStudent = async function isOwnedByStudent(id, studentCode) {
+  if (!mongoose.Types.ObjectId.isValid(id)) return false;
+  const normalizedStudentCode = String(studentCode || '').replace(/\D/g, '');
+  if (!normalizedStudentCode) return false;
+  const registration = await GraduateRegistration.findOne({
+    _id: new mongoose.Types.ObjectId(id),
+    barcodeValue: normalizedStudentCode
+  }).select({ _id: 1 }).lean();
+  return !!registration;
+};
+
 exports.update = async function update(id, body, request) {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     const error = new Error('Invalid graduate registration id');

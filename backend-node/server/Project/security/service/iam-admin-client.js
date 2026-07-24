@@ -1098,14 +1098,33 @@ async function forwardScopedSignin(request, response) {
 async function forwardMyPermissions(request, response) {
   try {
     if (request && request.authSession && request.authSession.source === 'local-student') {
+      const studentRegistrationPath = '/graduation/register';
       return response.status(200).json({
         status: true,
         data: {
           accountId: request.authAccount && request.authAccount._id ? String(request.authAccount._id) : null,
           assignments: [],
-          permissions: [],
-          matrix: {},
-          allowed: false
+          permissions: [{
+            path: studentRegistrationPath,
+            all: false,
+            view: true,
+            edit: true,
+            delete: false,
+            action: false,
+            logs: false
+          }],
+          matrix: {
+            [studentRegistrationPath]: {
+              all: false,
+              view: true,
+              edit: true,
+              delete: false,
+              action: false,
+              logs: false
+            }
+          },
+          effectivePermissions: [{ path: studentRegistrationPath, actions: ['view', 'edit'] }],
+          allowed: true
         }
       });
     }

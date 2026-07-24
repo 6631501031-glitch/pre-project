@@ -61,6 +61,7 @@ const router = new Router({
         {
           path: 'graduation/register',
           name: 'Graduate Self Registration',
+
           component: GraduateSelfRegistration
         },
         {

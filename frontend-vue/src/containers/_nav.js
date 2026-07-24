@@ -8,7 +8,7 @@ export default function buildNav (t) {
           name: t('graduation.nav.selfRegistration'),
           to: '/graduation/register',
           icon: 'cil-badge',
-          unrestricted: true
+
         },
         {
           _name: 'CSidebarNavItem',

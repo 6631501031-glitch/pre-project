@@ -29,6 +29,39 @@ function fail(response, error) {
   });
 }
 
+function isLocalStudent(request) {
+  return !!(request && request.authSession && request.authSession.source === 'local-student');
+}
+
+function localStudentCode(request) {
+  const account = request && request.authAccount ? request.authAccount : {};
+  const userinfo = account && account.userinfo ? account.userinfo : {};
+  return String(account.studentCode || account.code || account.username || userinfo.studentCode || '').replace(/\D/g, '');
+}
+
+function allowLocalStudent(permissionMiddleware, options) {
+  const settings = options || {};
+  return async function (request, response, next) {
+    if (!isLocalStudent(request)) return permissionMiddleware(request, response, next);
+
+    const studentCode = localStudentCode(request);
+    if (!studentCode) return response.status(403).json({ status: false, code: 40300, message: 'Student identity unavailable' });
+
+    if (settings.bindBody) {
+      request.body = Object.assign({}, request.body || {}, { barcodeValue: studentCode });
+    }
+    if (settings.requireOwnedRegistration) {
+      try {
+        const owned = await graduateRegistration.isOwnedByStudent(request.params.id, studentCode);
+        if (!owned) return response.status(403).json({ status: false, code: 40300, message: 'Registration access denied' });
+      } catch (error) {
+        return fail(response, error);
+      }
+    }
+    return next();
+  };
+}
+
 router.use(account.onCheckAuthorization);
 
 router.get('/registrations/me/defaults', async function (request, response) {
@@ -39,7 +72,7 @@ router.get('/registrations/me/defaults', async function (request, response) {
   }
 });
 
-router.get('/registrations/options', canViewRegistry, async function (request, response) {
+router.get('/registrations/options', allowLocalStudent(canViewRegistry), async function (request, response) {
   try {
     return ok(response, await graduateRegistration.options());
   } catch (error) {
@@ -63,7 +96,7 @@ router.get('/registrations', canViewRegistry, async function (request, response)
   }
 });
 
-router.post('/registrations', canViewRegistry, async function (request, response) {
+router.post('/registrations', allowLocalStudent(canViewRegistry, { bindBody: true }), async function (request, response) {
   try {
     return ok(response, await graduateRegistration.create(request.body || {}, request), 201);
   } catch (error) {
@@ -71,7 +104,7 @@ router.post('/registrations', canViewRegistry, async function (request, response
   }
 });
 
-router.put('/registrations/:id', canViewRegistry, async function (request, response) {
+router.put('/registrations/:id', allowLocalStudent(canViewRegistry, { bindBody: true, requireOwnedRegistration: true }), async function (request, response) {
   try {
     return ok(response, await graduateRegistration.update(request.params.id, request.body || {}, request));
   } catch (error) {
