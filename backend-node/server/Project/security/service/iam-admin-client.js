@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const config = require('../../../../config/config');
 const AccountModel = require('../../accounts/controller/account');
 const GraduateRegistration = require('../../graduationsystemusingfacerecognition/models/graduate_registration.model');
+const GraduateInitialCatalog = require('../../graduationsystemusingfacerecognition/service/graduate_initial_catalog');
 const { createGRADUATIONSYSTEMUSINGFACERECOGNITIONGRADUATIONSYSTEMUSINGFACERECOGNITIONSdk } = require('../../../integrations/iam/sdk');
 const USER_API_BASE_PATH = '/api/v1';
 
@@ -168,12 +169,22 @@ async function findRegistrationByStudentCode(studentCode) {
   const normalizedStudentCode = normalizeStudentCode(studentCode);
   if (!normalizedStudentCode) return null;
   try {
-    return await GraduateRegistration.findOne({ barcodeValue: normalizedStudentCode })
+    const registration = await GraduateRegistration.findOne({
+      $or: [
+        { studentCode: normalizedStudentCode },
+        { barcodeValue: normalizedStudentCode }
+      ]
+    })
       .sort({ updatedAt: -1 })
       .lean();
+    if (registration) return registration;
   } catch (err) {
-    return null;
+    // Fall through to the initial graduate catalog when MongoDB has no submitted form.
   }
+
+  return GraduateInitialCatalog.find(function (item) {
+    return normalizeStudentCode(item && (item.studentCode || item.barcodeValue)) === normalizedStudentCode;
+  }) || null;
 }
 
 function toLangArray(value, key) {
