@@ -32,7 +32,7 @@ const SettingMessageStatus = () => import('@/projects/views/setting/Status')
 
 Vue.use(Router)
 
-const DEFAULT_LANDING_PATH = '/dashboard'
+const DEFAULT_LANDING_PATH = '/graduation/register'
 
 const router = new Router({
   hash: false,
@@ -42,7 +42,7 @@ const router = new Router({
   routes: [
     {
       path: '/',
-      redirect: '/dashboard',
+      redirect: DEFAULT_LANDING_PATH,
       name: 'Home',
       component: TheContainer,
       children: [
@@ -61,25 +61,21 @@ const router = new Router({
         {
           path: 'graduation/register',
           name: 'Graduate Self Registration',
-          meta: { permission: { path: '/graduation-system-using-face-recognition/registry', action: 'view' } },
           component: GraduateSelfRegistration
         },
         {
           path: 'graduation/registrations',
           name: 'Graduate Registration Admin',
-          meta: { permission: { path: '/graduation-system-using-face-recognition/registry', action: 'view' } },
           component: GraduateRegistrationAdmin
         },
         {
           path: 'graduation/checkin-dashboard',
           name: 'Graduate Check-in Dashboard',
-          meta: { permission: { path: '/graduation-system-using-face-recognition/registry', action: 'view' } },
           component: GraduateCheckInDashboard
         },
         {
           path: 'graduation/face-checkin',
           name: 'Graduate Face Check-in',
-          meta: { permission: { path: '/graduation-system-using-face-recognition/registry', action: 'view' } },
           component: GraduateFaceCheckIn
         },
         {

@@ -8,7 +8,7 @@ import { getPayload } from '../shared/api'
 import { resolveFirstAccessiblePath } from '@/projects/utils/permission-landing'
 
 const X_ACCESS_TOKEN_STORAGE_KEY = 'x-access-token';
-const POST_SIGNIN_ROUTE = '/dashboard';
+const POST_SIGNIN_ROUTE = '/graduation/register';
 const APP_AUTH_SYSTEM = process.env.VUE_APP_AUTH_SYSTEM || process.env.VUE_APP_PROJECT_APP_ID || 'graduationsystemusingfacerecognition';
 
 function normalizeStudentCode(value) {

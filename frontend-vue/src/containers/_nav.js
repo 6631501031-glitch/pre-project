@@ -8,21 +8,21 @@ export default function buildNav (t) {
           name: t('graduation.nav.selfRegistration'),
           to: '/graduation/register',
           icon: 'cil-badge',
-          permission: { path: '/graduation-system-using-face-recognition/registry', action: 'view' }
+          unrestricted: true
         },
         {
           _name: 'CSidebarNavItem',
           name: t('graduation.nav.registrationAdmin'),
           to: '/graduation/registrations',
           icon: 'cil-list-rich',
-          permission: { path: '/graduation-system-using-face-recognition/registry', action: 'view' }
+          unrestricted: true
         },
         {
           _name: 'CSidebarNavItem',
           name: t('graduation.nav.checkinDashboard'),
           to: '/graduation/checkin-dashboard',
           icon: 'cil-calendar-check',
-          permission: { path: '/graduation-system-using-face-recognition/registry', action: 'view' }
+          unrestricted: true
         }
       ]
     }
