@@ -67,16 +67,19 @@ const router = new Router({
         {
           path: 'graduation/registrations',
           name: 'Graduate Registration Admin',
+          meta: { adminOnly: true },
           component: GraduateRegistrationAdmin
         },
         {
           path: 'graduation/checkin-dashboard',
           name: 'Graduate Check-in Dashboard',
+          meta: { adminOnly: true },
           component: GraduateCheckInDashboard
         },
         {
           path: 'graduation/face-checkin',
           name: 'Graduate Face Check-in',
+          meta: { adminOnly: true },
           component: GraduateFaceCheckIn
         },
         {
@@ -299,6 +302,8 @@ router.beforeEach(async (to, from, next) => {
   const hasToken = !!store.state.XAccessToken
   const authState = store.getters['auth/authenticated'] || {}
   const isAuthenticated = !!authState.isAuthen
+  const profile = store.getters['auth/profile'] || {}
+  const isStudentLogin = !!String(profile.studentCode || profile.barcodeValue || '').replace(/\D/g, '')
 
   if (!isPublicPage && (!hasToken || !isAuthenticated)) {
     return next({ path: '/pages/login' })
@@ -307,6 +312,10 @@ router.beforeEach(async (to, from, next) => {
   if (to.path === '/pages/login' && hasToken && isAuthenticated) {
     await ensurePermissionLoaded()
     return next({ path: resolveLandingPath() })
+  }
+
+  if (to.meta && to.meta.adminOnly && isStudentLogin) {
+    return next({ path: '/graduation/register' })
   }
 
   const permissionMeta = to.meta && to.meta.permission
