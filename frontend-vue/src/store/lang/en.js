@@ -1057,6 +1057,12 @@ en.graduation = {
         stats: {
             total: "Total records",
             totalHint: "Data loaded from MongoDB",
+            totalGraduates: "Total graduates",
+            responded: "Intention submitted",
+            pending: "Intention not submitted",
+            responseRate: "Form response rate",
+            responseRateHint: "Of all graduates",
+            peopleUnit: "people",
             special: "Assistance requested",
             specialHint: "Selected status code 20",
             assisted: "Assistance type set",

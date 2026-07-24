@@ -2,9 +2,7 @@
   <div class="checkin-dashboard-page">
     <div class="checkin-dashboard-header">
       <div>
-        <div class="checkin-dashboard-header__eyebrow">{{ $t('graduation.checkin.eyebrow') }}</div>
         <h1>{{ $t('graduation.checkin.title') }}</h1>
-        <p>{{ $t('graduation.checkin.subtitle') }}</p>
       </div>
       <div class="checkin-dashboard-header__actions">
         <CButton color="primary" variant="outline" :disabled="loading" @click="fetchRegistrations">
@@ -291,23 +289,11 @@ export default {
   align-items: flex-start;
   margin-bottom: 18px;
 }
-.checkin-dashboard-header__eyebrow {
-  margin-bottom: 4px;
-  color: #8c1515;
-  font-size: 12px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
 .checkin-dashboard-header h1 {
   margin: 0;
   color: #111827;
   font-size: 30px;
   font-weight: 800;
-}
-.checkin-dashboard-header p {
-  max-width: 820px;
-  margin: 6px 0 0;
-  color: #6b7280;
 }
 .checkin-dashboard-header__actions {
   display: flex;

@@ -2,9 +2,7 @@
   <div class="graduate-admin-page">
     <div class="graduate-admin-header">
       <div>
-        <div class="graduate-admin-header__eyebrow">{{ $t('graduation.admin.eyebrow') }}</div>
         <h1>{{ $t('graduation.admin.title') }}</h1>
-        <p>{{ $t('graduation.admin.subtitle') }}</p>
       </div>
       <div class="graduate-admin-header__actions">
         <CButton color="primary" variant="outline" :disabled="loading" @click="fetchRegistrations">
@@ -18,10 +16,18 @@
       <CCol v-for="item in statCards" :key="item.key" class="graduate-admin-stats-col">
         <CCard class="graduate-admin-card graduate-admin-stat">
           <CCardBody class="graduate-admin-stat__body">
-            <div class="graduate-admin-stat__value">{{ item.value.toLocaleString() }}</div>
+            <div :class="['graduate-admin-stat__icon', `graduate-admin-stat__icon--${item.tone}`]">
+              <CIcon :name="item.icon" />
+            </div>
             <div class="graduate-admin-stat__content">
-              <span v-if="item.code" class="graduate-admin-stat__code">{{ item.code }}</span>
               <div class="graduate-admin-stat__label">{{ item.label }}</div>
+              <div class="graduate-admin-stat__metric">
+                <strong>{{ item.displayValue }}</strong>
+                <span v-if="item.unit">{{ item.unit }}</span>
+              </div>
+              <div v-if="item.hint" :class="['graduate-admin-stat__hint', `graduate-admin-stat__hint--${item.tone}`]">
+                {{ item.hint }}
+              </div>
             </div>
           </CCardBody>
         </CCard>
@@ -55,6 +61,10 @@
             class="graduate-admin-status"
             :options="localizedCeremonyStatusFilterOptions"
           />
+          <CButton color="primary" :disabled="loading" @click="fetchRegistrations">
+            <CIcon name="cil-magnifying-glass" class="mr-2" />
+            {{ $t('graduation.admin.actions.search') }}
+          </CButton>
           <CButton color="secondary" variant="outline" :disabled="loading" @click="clearFilters">{{ $t('graduation.admin.actions.clear') }}</CButton>
         </div>
 
@@ -325,21 +335,51 @@ export default {
       ]
     },
     statCards () {
-      const statusCards = CEREMONY_STATUS_OPTIONS.map(status => ({
-        key: status.value,
-        code: status.value,
-        label: this.$t(`graduation.ceremonyStatus.${status.key}`),
-        value: this.registrations.filter(item => normalizeCeremonyStatus(item.ceremonyStatus) === status.value).length
-      }))
-      return [{
-        key: 'total',
-        label: this.$t('graduation.admin.stats.total'),
-        value: this.registrations.length
-      }].concat(statusCards, {
-        key: 'food-allergy',
-        label: this.$t('graduation.admin.stats.foodAllergy'),
-        value: this.registrations.filter(item => this.hasFoodAllergy(item)).length
-      })
+      const total = this.registrations.length
+      const responded = this.registrations.filter(item => {
+        const status = normalizeCeremonyStatus(item.ceremonyStatus)
+        return status && status !== '80'
+      }).length
+      const pending = Math.max(total - responded, 0)
+      const responseRate = total ? (responded / total) * 100 : 0
+      const peopleUnit = this.$t('graduation.admin.stats.peopleUnit')
+
+      return [
+        {
+          key: 'total',
+          label: this.$t('graduation.admin.stats.totalGraduates'),
+          displayValue: total.toLocaleString(),
+          unit: peopleUnit,
+          icon: 'cil-people',
+          tone: 'primary'
+        },
+        {
+          key: 'responded',
+          label: this.$t('graduation.admin.stats.responded'),
+          displayValue: responded.toLocaleString(),
+          unit: peopleUnit,
+          hint: `${responseRate.toFixed(2)}%`,
+          icon: 'cil-envelope-open',
+          tone: 'success'
+        },
+        {
+          key: 'pending',
+          label: this.$t('graduation.admin.stats.pending'),
+          displayValue: pending.toLocaleString(),
+          unit: peopleUnit,
+          hint: `${(100 - responseRate).toFixed(2)}%`,
+          icon: 'cil-user-unfollow',
+          tone: 'warning'
+        },
+        {
+          key: 'response-rate',
+          label: this.$t('graduation.admin.stats.responseRate'),
+          displayValue: `${responseRate.toFixed(2)}%`,
+          hint: this.$t('graduation.admin.stats.responseRateHint'),
+          icon: 'cil-chart-line',
+          tone: 'purple'
+        }
+      ]
     }
   },
   mounted () {
@@ -536,17 +576,6 @@ export default {
   font-size: 30px;
   font-weight: 700;
 }
-.graduate-admin-header p {
-  margin: 6px 0 0;
-  color: #6b7280;
-}
-.graduate-admin-header__eyebrow {
-  margin-bottom: 4px;
-  color: #8c1515;
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
 .graduate-admin-header__actions {
   display: flex;
   gap: 10px;
@@ -564,65 +593,91 @@ export default {
   margin-left: -6px;
 }
 .graduate-admin-stats-col {
-  flex: 0 0 20%;
-  max-width: 20%;
+  flex: 0 0 25%;
+  max-width: 25%;
   padding-right: 6px;
   padding-bottom: 12px;
   padding-left: 6px;
 }
-.graduate-admin-stats-col:nth-child(n + 6) {
-  flex-basis: 25%;
-  max-width: 25%;
-}
 .graduate-admin-stat {
   height: 100%;
   margin-bottom: 0;
+  background: #ffffff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
 }
 .graduate-admin-stat__body {
   display: flex;
   align-items: center;
-  gap: 14px;
-  min-height: 82px;
-  padding: 14px 16px;
+  gap: 13px;
+  min-height: 108px;
+  padding: 18px 16px;
 }
-.graduate-admin-stat__content {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  min-width: 0;
-}
-.graduate-admin-stat__code {
+.graduate-admin-stat__icon {
   display: inline-flex;
-  flex: 0 0 auto;
+  flex: 0 0 52px;
   align-items: center;
   justify-content: center;
-  min-width: 34px;
-  height: 24px;
-  padding: 0 7px;
-  border-radius: 6px;
-  background: #f1f5f9;
-  color: #475569;
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 25px;
+}
+.graduate-admin-stat__icon--primary {
+  background: linear-gradient(135deg, #6d83f2, #5669dc);
+}
+.graduate-admin-stat__icon--success {
+  background: linear-gradient(135deg, #77ca54, #54af36);
+}
+.graduate-admin-stat__icon--warning {
+  background: linear-gradient(135deg, #ffbd3f, #f59e0b);
+}
+.graduate-admin-stat__icon--purple {
+  background: linear-gradient(135deg, #b569ea, #8f48cf);
+}
+.graduate-admin-stat__content {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 .graduate-admin-stat__label {
-  color: #374151;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.45;
+  margin-bottom: 2px;
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
   overflow-wrap: anywhere;
   white-space: normal;
 }
-.graduate-admin-stat__value {
-  flex: 0 0 auto;
-  min-width: 64px;
+.graduate-admin-stat__metric {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.graduate-admin-stat__metric strong {
   color: #111827;
-  font-size: 25px;
-  font-weight: 700;
+  font-size: 24px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
-  line-height: 1;
-  text-align: center;
+  line-height: 1.15;
+}
+.graduate-admin-stat__metric span {
+  color: #6b7280;
+  font-size: 11px;
+}
+.graduate-admin-stat__hint {
+  margin-top: 4px;
+  color: #6b7280;
+  font-size: 11px;
+  line-height: 1.25;
+}
+.graduate-admin-stat__hint--success {
+  color: #55ad3a;
+  font-weight: 700;
+}
+.graduate-admin-stat__hint--warning {
+  color: #d98a00;
+  font-weight: 700;
 }
 .graduate-admin-toolbar {
   display: flex;
@@ -742,8 +797,7 @@ export default {
   .graduate-admin-header__actions {
     flex-direction: column;
   }
-  .graduate-admin-stats-col,
-  .graduate-admin-stats-col:nth-child(n + 6) {
+  .graduate-admin-stats-col {
     flex: 0 0 100%;
     max-width: 100%;
   }
@@ -753,8 +807,7 @@ export default {
   }
 }
 @media (min-width: 769px) and (max-width: 1199px) {
-  .graduate-admin-stats-col,
-  .graduate-admin-stats-col:nth-child(n + 6) {
+  .graduate-admin-stats-col {
     flex: 0 0 50%;
     max-width: 50%;
   }

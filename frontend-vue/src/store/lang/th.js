@@ -1059,6 +1059,12 @@ th.graduation = {
         stats: {
             total: "รายการทั้งหมด",
             totalHint: "ข้อมูลที่โหลดจาก MongoDB",
+            totalGraduates: "บัณฑิตทั้งหมด",
+            responded: "แจ้งความประสงค์แล้ว",
+            pending: "ยังไม่แจ้งความประสงค์",
+            responseRate: "อัตราการตอบแบบฟอร์ม",
+            responseRateHint: "จากจำนวนบัณฑิตทั้งหมด",
+            peopleUnit: "คน",
             special: "ขอความช่วยเหลือ",
             specialHint: "เลือกสถานะหมายเลข 20",
             assisted: "ระบุประเภทช่วยเหลือ",
