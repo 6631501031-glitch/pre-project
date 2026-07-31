@@ -11,6 +11,7 @@ const auditSchema = new Schema({
 }, { _id: false });
 
 const addressSchema = new Schema({
+  companyName: { type: String, trim: true, default: null },
   houseNo: { type: String, trim: true, default: null },
   moo: { type: String, trim: true, default: null },
   soi: { type: String, trim: true, default: null },

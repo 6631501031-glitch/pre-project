@@ -866,6 +866,9 @@ const en = {
 en.graduation = {
     nav: {
         selfRegistration: "Student intention request system",
+        questionnaire: "Questionnaire",
+        ceremonyPreferences: "Ceremony preferences",
+        faceCheckIn: "Face registration",
         registrationAdmin: "Graduate registration data",
         checkinDashboard: "Check-in dashboard"
     },
@@ -965,6 +968,7 @@ en.graduation = {
         current: "Current address",
         work: "Work address",
         fields: {
+            companyName: "Company / workplace name",
             houseNo: "House no.",
             moo: "Village no.",
             soi: "Soi",

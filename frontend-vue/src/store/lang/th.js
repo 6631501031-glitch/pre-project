@@ -868,6 +868,9 @@ const th = {
 th.graduation = {
     nav: {
         selfRegistration: "ระบบแจ้งความประสงค์นักศึกษา",
+        questionnaire: "แบบสอบถาม",
+        ceremonyPreferences: "ข้อมูลการเข้ารับปริญญา",
+        faceCheckIn: "สแกนใบหน้า",
         registrationAdmin: "ข้อมูลลงทะเบียนบัณฑิต",
         checkinDashboard: "แดชบอร์ดเช็กชื่อ",
     },
@@ -908,8 +911,8 @@ th.graduation = {
     fields: {
         firstName: "ชื่อจริง",
         lastName: "นามสกุล",
-        firstNamePronunciation: "สะกดชื่อจริงสำหรับผู้อ่านประกาศ",
-        lastNamePronunciation: "สะกดนามสกุลสำหรับผู้อ่านประกาศ",
+        firstNamePronunciation: "สะกดชื่อจริง",
+        lastNamePronunciation: "สะกดนามสกุล",
         phone: "เบอร์ติดต่อ",
         email: "อีเมล",
         school: "สำนักวิชา",
@@ -967,6 +970,7 @@ th.graduation = {
         current: "ที่อยู่ปัจจุบัน",
         work: "ที่อยู่ที่ทำงาน",
         fields: {
+            companyName: "ชื่อบริษัท/สถานที่ทำงาน",
             houseNo: "บ้านเลขที่",
             moo: "หมู่",
             soi: "ซอย",
