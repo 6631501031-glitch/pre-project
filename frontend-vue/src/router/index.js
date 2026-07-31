@@ -11,6 +11,8 @@ const Page500 = () => import('@/views/pages/Page500')
 const Login = () => import('@/views/pages/Login')
 const GRADUATIONSYSTEMUSINGFACERECOGNITIONGRADUATIONSYSTEMUSINGFACERECOGNITIONRegistry = () => import('@/projects/views/graduationsystemusingfacerecognition/GRADUATIONSYSTEMUSINGFACERECOGNITIONGRADUATIONSYSTEMUSINGFACERECOGNITIONRegistry')
 const GraduateSelfRegistration = () => import('@/projects/views/graduation/GraduateSelfRegistration')
+const GraduateQuestionnaire = () => import('@/projects/views/graduation/GraduateQuestionnaire')
+const GraduateCeremonyPreferences = () => import('@/projects/views/graduation/GraduateCeremonyPreferences')
 const GraduateRegistrationAdmin = () => import('@/projects/views/graduation/GraduateRegistrationAdmin')
 const GraduateCheckInDashboard = () => import('@/projects/views/graduation/GraduateCheckInDashboard')
 const GraduateFaceCheckIn = () => import('@/projects/views/graduation/GraduateFaceCheckIn')
@@ -65,6 +67,16 @@ const router = new Router({
           component: GraduateSelfRegistration
         },
         {
+          path: 'graduation/questionnaire',
+          name: 'Graduate Questionnaire',
+          component: GraduateQuestionnaire
+        },
+        {
+          path: 'graduation/ceremony-preferences',
+          name: 'Graduate Ceremony Preferences',
+          component: GraduateCeremonyPreferences
+        },
+        {
           path: 'graduation/registrations',
           name: 'Graduate Registration Admin',
           meta: { adminOnly: true },
@@ -79,7 +91,6 @@ const router = new Router({
         {
           path: 'graduation/face-checkin',
           name: 'Graduate Face Check-in',
-          meta: { adminOnly: true },
           component: GraduateFaceCheckIn
         },
         {

@@ -2,14 +2,12 @@
   <div class="graduate-registration-page">
     <div class="registration-header">
       <div>
-        <div class="registration-header__eyebrow">{{ $t('graduation.self.eyebrow') }}</div>
         <h1>{{ $t('graduation.self.title') }}</h1>
-        <p>{{ $t('graduation.self.subtitle') }}</p>
       </div>
     </div>
 
     <CRow>
-      <CCol lg="8" class="mb-3">
+      <CCol lg="12" class="mb-3">
         <CCard class="registration-card">
           <CCardBody>
             <div class="section-heading">
@@ -69,7 +67,6 @@
                       @input="onPhoneCountryInput"
                       @change="onPhoneCountryInput"
                     />
-                    <div class="phone-dial-code">{{ phoneDialCode }}</div>
                     <CInput
                       v-model="phoneLocalNumber"
                       type="tel"
@@ -88,38 +85,29 @@
                 <CInput v-model.trim="form.email" type="email" :label="$t('graduation.fields.email')" :readonly="isLockedField('email')" :class="{ 'readonly-white': isLockedField('email') }" />
               </CCol>
             </CRow>
-          </CCardBody>
-        </CCard>
-
-        <CCard class="registration-card mt-3">
-          <CCardBody>
-            <div class="section-heading">
+            <div class="section-heading section-heading--separated">
               <h2>{{ $t('graduation.self.sections.school') }}</h2>
             </div>
             <CRow>
               <CCol md="6" class="required-field">
-                <CSelect
+                <CInput
                   ref="schoolField"
-                  v-model="form.school"
+                  :value="summarySchool"
                   :label="$t('graduation.fields.school')"
-                  :options="schoolOptions"
-                  :class="{ 'is-invalid': hasFieldError('school') }"
-                  @input="onSchoolInput"
-                  @change="onSchoolInput"
+                  readonly
+                  :tabindex="-1"
+                  :class="[{ 'is-invalid': hasFieldError('school') }, 'readonly-white']"
                 />
                 <div v-if="hasFieldError('school')" class="invalid-feedback d-block">{{ validationErrors.school }}</div>
               </CCol>
               <CCol md="6" class="required-field">
-                <CSelect
+                <CInput
                   ref="programField"
-                  :key="programSelectKey"
-                  v-model="form.program"
+                  :value="summaryProgram"
                   :label="$t('graduation.fields.program')"
-                  :options="programOptions"
-                  :disabled="!form.school"
-                  :class="{ 'is-invalid': hasFieldError('program') }"
-                  @input="onProgramInput"
-                  @change="onProgramInput"
+                  readonly
+                  :tabindex="-1"
+                  :class="[{ 'is-invalid': hasFieldError('program') }, 'readonly-white']"
                 />
                 <div v-if="hasFieldError('program')" class="invalid-feedback d-block">{{ validationErrors.program }}</div>
               </CCol>
@@ -131,267 +119,51 @@
           <CCardBody>
             <div class="address-group-heading">
               <h2>{{ addressGroupTitle }}</h2>
-              <p>{{ addressGroupDescription }}</p>
+            </div>
+            <div class="address-panel address-panel--home">
+              <AddressFields
+                :title="$t('graduation.address.home')"
+                :address="form.homeAddress"
+                :required="true"
+                :show-required-mark="false"
+                :readonly="false"
+                :hide-save="true"
+                :source-options="[]"
+              />
             </div>
             <div class="address-panel">
               <AddressFields
                 :title="$t('graduation.address.current')"
                 :address="form.currentAddress"
-                :readonly="isAddressReadonly('currentAddress')"
-                :source-options="addressSourceOptions('currentAddress')"
-                :edit-label="addressEditLabel"
-                :save-label="addressSaveLabel"
-                @edit="enableAddressEdit('currentAddress')"
-                @select-source="onAddressSourceSelect('currentAddress', $event)"
-                @save="saveAddressEdit('currentAddress')"
-              />
-            </div>
-            <div class="address-panel">
-              <AddressFields
-                :title="$t('graduation.address.home')"
-                :address="form.homeAddress"
-                :readonly="isAddressReadonly('homeAddress')"
-                :source-options="addressSourceOptions('homeAddress')"
-                :edit-label="addressEditLabel"
-                :save-label="addressSaveLabel"
-                @edit="enableAddressEdit('homeAddress')"
-                @select-source="onAddressSourceSelect('homeAddress', $event)"
-                @save="saveAddressEdit('homeAddress')"
+                :required="true"
+                :show-required-mark="false"
+                :readonly="false"
+                :hide-save="true"
+                :source-options="[]"
               />
             </div>
             <div class="address-panel">
               <AddressFields
                 :title="$t('graduation.address.work')"
                 :address="form.workAddress"
-                :readonly="isAddressReadonly('workAddress')"
+                :readonly="false"
+                :hide-save="true"
+                :show-company-name="true"
                 :source-options="[]"
-                :edit-label="addressEditLabel"
-                :save-label="addressSaveLabel"
-                @edit="enableAddressEdit('workAddress')"
                 @select-source="onAddressSourceSelect('workAddress', $event)"
-                @save="saveAddressEdit('workAddress')"
               />
             </div>
           </CCardBody>
         </CCard>
 
-        <CCard class="registration-card questionnaire-sample-card mt-3">
-          <CCardBody>
-            <div class="section-heading questionnaire-sample-heading">
-              <h2>{{ questionnaireSampleTitle }}<span class="required-mark">*</span></h2>
-            </div>
-            <CRow>
-              <CCol md="6">
-                <CSelect
-                  ref="questionnaireEmploymentStatusField"
-                  v-model="form.questionnaireEmploymentStatus"
-                  :label="questionnaireSampleQuestion"
-                  :options="questionnaireSampleOptions"
-                />
-              </CCol>
-              <CCol md="6">
-                <CTextarea
-                  v-model.trim="form.questionnaireNote"
-                  :label="questionnaireSampleNoteLabel"
-                  rows="2"
-                />
-              </CCol>
-            </CRow>
-          </CCardBody>
-        </CCard>
-
-        <CCard class="registration-card mt-3">
-          <CCardBody>
-            <div class="section-heading ceremony-section-heading">
-              <h2>{{ $t('graduation.fields.ceremonyStatus') }}<span class="required-mark">*</span></h2>
-            </div>
-            <CRow>
-              <CCol md="12">
-                <CSelect
-                  ref="ceremonyStatusField"
-                  v-model="form.ceremonyStatus"
-                  :label="ceremonyStatusSelectLabel"
-                  :options="ceremonyStatusOptions"
-                  :class="['ceremony-status-select', { 'is-invalid': hasFieldError('ceremonyStatus') }]"
-                  @input="onCeremonyStatusInput"
-                  @change="onCeremonyStatusInput"
-                />
-                <div v-if="hasFieldError('ceremonyStatus')" class="invalid-feedback d-block">{{ validationErrors.ceremonyStatus }}</div>
-              </CCol>
-              <CCol v-if="requiresAssistanceType" md="12" class="required-field">
-                <CSelect
-                  ref="ceremonyAssistanceTypeField"
-                  :key="ceremonyAssistanceSelectKey"
-                  v-model="form.ceremonyAssistanceType"
-                  :label="$t('graduation.fields.assistanceType')"
-                  :options="ceremonyAssistanceTypeOptions"
-                  :class="{ 'is-invalid': hasFieldError('ceremonyAssistanceType') }"
-                  @input="onCeremonyAssistanceTypeInput"
-                  @change="onCeremonyAssistanceTypeInput"
-                />
-                <div v-if="hasFieldError('ceremonyAssistanceType')" class="invalid-feedback d-block">{{ validationErrors.ceremonyAssistanceType }}</div>
-              </CCol>
-              <CCol v-if="ceremonyStatusRequiresNote" md="12">
-                <CTextarea
-                  v-model.trim="form.ceremonyStatusNote"
-                  :label="$t('graduation.fields.extraDetail')"
-                  rows="2"
-                />
-              </CCol>
-              <CCol v-if="requiresCertificateDelivery" md="12">
-                <div class="certificate-delivery-block">
-                  <div class="certificate-delivery-title">{{ $t('graduation.certificate.title') }}</div>
-                  <CSelect
-                    ref="certificateDeliveryMethodField"
-                    v-model="form.certificateDeliveryMethod"
-                    :label="$t('graduation.certificate.method')"
-                    :options="certificateDeliveryMethodOptions"
-                    :class="['required-field', { 'is-invalid': hasFieldError('certificateDeliveryMethod') }]"
-                    @input="onCertificateDeliveryMethodInput"
-                    @change="onCertificateDeliveryMethodInput"
-                  />
-                  <div v-if="hasFieldError('certificateDeliveryMethod')" class="invalid-feedback d-block">{{ validationErrors.certificateDeliveryMethod }}</div>
-                  <template v-if="requiresCertificateShipping">
-                    <div
-                      ref="certificateShippingServiceField"
-                      class="shipping-service-picker"
-                      :class="{ 'is-invalid': hasFieldError('certificateShippingService') }"
-                    >
-                      <div class="shipping-service-label">{{ $t('graduation.certificate.shippingService') }}<span class="required-mark">*</span></div>
-                      <div class="shipping-rate-grid">
-                        <button
-                          v-for="item in certificateShippingRates"
-                          :key="item.value"
-                          type="button"
-                          class="shipping-rate-card"
-                          :class="{ 'shipping-rate-card--selected': form.certificateShippingService === item.value }"
-                          :aria-pressed="form.certificateShippingService === item.value ? 'true' : 'false'"
-                          @click="selectCertificateShippingService(item.value)"
-                        >
-                          <span class="shipping-rate-card__check" aria-hidden="true"></span>
-                          <strong>{{ item.label }}</strong>
-                          <span>{{ item.description }}</span>
-                          <em>{{ item.fee }}</em>
-                        </button>
-                      </div>
-                    </div>
-                    <div v-if="hasFieldError('certificateShippingService')" class="invalid-feedback d-block">{{ validationErrors.certificateShippingService }}</div>
-                    <div
-                      ref="certificateDeliveryAddressField"
-                      class="certificate-delivery-address"
-                      :class="{ 'is-invalid': hasFieldError('certificateDeliveryAddress') }"
-                    >
-                      <AddressFields
-                        :title="$t('graduation.certificate.deliveryAddress')"
-                        :address="form.certificateDeliveryAddress"
-                        :required="true"
-                        :readonly="isAddressReadonly('certificateDeliveryAddress')"
-                        :source-options="addressSourceOptions('certificateDeliveryAddress')"
-                        :edit-label="addressEditLabel"
-                        :save-label="addressSaveLabel"
-                        @edit="enableAddressEdit('certificateDeliveryAddress')"
-                        @select-source="onAddressSourceSelect('certificateDeliveryAddress', $event)"
-                        @save="saveAddressEdit('certificateDeliveryAddress')"
-                      />
-                    </div>
-                    <div v-if="hasFieldError('certificateDeliveryAddress')" class="invalid-feedback d-block">{{ validationErrors.certificateDeliveryAddress }}</div>
-                  </template>
-                </div>
-              </CCol>
-              <CCol md="12">
-                <CSelect
-                  v-model="form.hasFoodAllergy"
-                  :label="$t('graduation.fields.foodAllergy')"
-                  :options="localizedYesNoOptions"
-                  @input="onFoodAllergyInput"
-                  @change="onFoodAllergyInput"
-                />
-              </CCol>
-            </CRow>
-            <div :class="{ 'required-field': requiresFoodAllergyNote }">
-              <CTextarea
-                ref="foodAllergyNoteField"
-                v-model.trim="form.foodAllergyNote"
-                :label="$t('graduation.fields.foodAllergyNote')"
-                rows="2"
-                :readonly="foodAllergyNoteDisabled"
-                :tabindex="foodAllergyNoteDisabled ? -1 : 0"
-                :class="[{ 'is-invalid': hasFieldError('foodAllergyNote') }, { 'readonly-white': foodAllergyNoteDisabled }]"
-              />
-            </div>
-            <div v-if="requiresFoodAllergyNote" class="field-help-text">
-              {{ foodAllergyHelpText }}
-            </div>
-            <CAlert v-if="hasFieldError('foodAllergyNote')" color="danger" class="mt-2 mb-0">
-              {{ $t('graduation.messages.foodAllergyRequired') }}
-            </CAlert>
-            <div v-if="hasFieldError('foodAllergyNote')" class="invalid-feedback d-block">
-              {{ $t('graduation.messages.foodAllergyRequired') }}
-            </div>
-          </CCardBody>
-        </CCard>
+        <div class="form-actions">
+          <CButton color="primary" :disabled="saveButtonDisabled" class="summary-save-button" @click="goToFacePage">
+            <CIcon name="cil-save" class="mr-2" />
+            {{ saving ? $t('graduation.self.actions.saving') : $t('graduation.self.actions.save') }}
+          </CButton>
+        </div>
       </CCol>
 
-      <CCol lg="4" class="mb-3">
-        <CCard class="registration-card sticky-summary summary-card">
-          <CCardBody>
-            <div class="section-heading summary-heading">
-              <div>
-                <div class="summary-heading__icon">
-                  <CIcon name="cil-clipboard" />
-                </div>
-                <h2>{{ $t('graduation.self.summary.title') }}</h2>
-              </div>
-              <CBadge :color="completionColor" class="summary-badge">
-                {{ completionLabel }}
-              </CBadge>
-            </div>
-            <div class="summary-list">
-              <div>
-                <span>{{ $t('graduation.self.summary.name') }}</span>
-                <strong>{{ fullName || '-' }}</strong>
-              </div>
-              <div>
-                <span>{{ $t('graduation.self.summary.pronunciation') }}</span>
-                <strong>{{ namePronunciation || '-' }}</strong>
-              </div>
-              <div>
-                <span>{{ $t('graduation.fields.school') }}</span>
-                <strong>{{ summarySchool || '-' }}</strong>
-              </div>
-              <div>
-                <span>{{ $t('graduation.fields.programShort') }}</span>
-                <strong>{{ summaryProgram || '-' }}</strong>
-              </div>
-              <div>
-                <span>{{ $t('graduation.self.summary.ceremonyStatus') }}</span>
-                <strong>{{ ceremonyStatusLabel }}</strong>
-              </div>
-              <div>
-                <span>{{ $t('graduation.fields.foodAllergy') }}</span>
-                <strong>{{ foodAllergySummaryLabel }}</strong>
-              </div>
-              <div v-if="requiresFoodAllergyNote">
-                <span>{{ $t('graduation.fields.foodAllergyNote') }}</span>
-                <strong>{{ form.foodAllergyNote || '-' }}</strong>
-              </div>
-            </div>
-            <div class="summary-progress-label">
-              <span>{{ completionPercent }}%</span>
-              <em>{{ completionLabel }}</em>
-            </div>
-            <div class="completion-meter">
-              <span :style="{ width: completionPercent + '%' }"></span>
-            </div>
-            <div class="summary-actions">
-              <CButton color="primary" :disabled="saveButtonDisabled" class="summary-save-button" @click="goToFacePage">
-                <CIcon name="cil-save" class="mr-2" />
-                {{ saving ? $t('graduation.self.actions.saving') : $t('graduation.self.actions.save') }}
-              </CButton>
-            </div>
-          </CCardBody>
-        </CCard>
-      </CCol>
     </CRow>
   </div>
 </template>
@@ -399,6 +171,7 @@
 <script>
 import api from '@/service/api'
 import { notifyError, notifySuccess } from '@/projects/utils/notify'
+import { markGraduationStep } from '@/projects/utils/graduation-workflow-progress'
 import SCHOOL_PROGRAM_CATALOG from './school-program-catalog'
 import GRADUATE_INITIAL_CATALOG from './graduate-initial-catalog'
 
@@ -412,13 +185,6 @@ const VALIDATION_FIELD_ORDER = [
   'phone',
   'school',
   'program',
-  'questionnaireEmploymentStatus',
-  'ceremonyStatus',
-  'ceremonyAssistanceType',
-  'certificateDeliveryMethod',
-  'certificateShippingService',
-  'certificateDeliveryAddress',
-  'foodAllergyNote'
 ]
 
 const THAI_SCHOOL_PROGRAMS = {
@@ -650,6 +416,7 @@ const REQUIRED_ADDRESS_FIELD_KEYS = ['houseNo', 'moo', 'subdistrict', 'district'
 
 function emptyAddress () {
   return {
+    companyName: '',
     houseNo: '',
     moo: '',
     soi: '',
@@ -942,6 +709,9 @@ export default {
         address: { type: Object, required: true },
         readonly: { type: Boolean, default: false },
         required: { type: Boolean, default: false },
+        showRequiredMark: { type: Boolean, default: true },
+        hideSave: { type: Boolean, default: false },
+        showCompanyName: { type: Boolean, default: false },
         editLabel: { type: String, default: 'แก้ไข' },
         saveLabel: { type: String, default: 'บันทึก' },
         sourceOptions: {
@@ -952,7 +722,7 @@ export default {
       template: `
         <div class="address-block" :class="{ 'readonly-white': readonly }">
           <div class="address-subsection">
-            <span>{{ title }}<span v-if="required" class="required-mark">*</span></span>
+            <span>{{ title }}<span v-if="required && showRequiredMark" class="required-mark">*</span></span>
             <CButton
               v-if="readonly"
               color="primary"
@@ -983,10 +753,13 @@ export default {
             </CButton>
           </div>
           <CRow class="address-grid">
-            <CCol md="3" class="address-required-field">
+            <CCol v-if="showCompanyName" md="12">
+              <CInput v-model.trim="address.companyName" :label="$t('graduation.address.fields.companyName')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
+            </CCol>
+            <CCol md="3" :class="{ 'address-required-field': required }">
               <CInput v-model.trim="address.houseNo" :label="$t('graduation.address.fields.houseNo')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
             </CCol>
-            <CCol md="3" class="address-required-field">
+            <CCol md="3" :class="{ 'address-required-field': required }">
               <CInput v-model.trim="address.moo" :label="$t('graduation.address.fields.moo')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
             </CCol>
             <CCol md="3">
@@ -995,16 +768,16 @@ export default {
             <CCol md="3">
               <CInput v-model.trim="address.soi" :label="$t('graduation.address.fields.soi')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
             </CCol>
-            <CCol md="3" class="address-required-field">
+            <CCol md="3" :class="{ 'address-required-field': required }">
               <CInput v-model.trim="address.subdistrict" :label="$t('graduation.address.fields.subdistrict')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
             </CCol>
-            <CCol md="3" class="address-required-field">
+            <CCol md="3" :class="{ 'address-required-field': required }">
               <CInput v-model.trim="address.district" :label="$t('graduation.address.fields.district')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
             </CCol>
-            <CCol md="3" class="address-required-field">
+            <CCol md="3" :class="{ 'address-required-field': required }">
               <CInput v-model.trim="address.province" :label="$t('graduation.address.fields.province')" :readonly="readonly" :tabindex="readonly ? -1 : 0" />
             </CCol>
-            <CCol md="3" class="address-required-field">
+            <CCol md="3" :class="{ 'address-required-field': required }">
               <CInput
                 v-model.trim="address.postalCode"
                 type="tel"
@@ -1019,7 +792,7 @@ export default {
               />
             </CCol>
           </CRow>
-          <div v-if="!readonly" class="address-save-row">
+          <div v-if="!readonly && !hideSave" class="address-save-row">
             <CButton
               color="success"
               variant="outline"
@@ -1140,11 +913,6 @@ export default {
     addressGroupTitle () {
       return this.isEnglishLocale ? 'Address information' : 'ข้อมูลที่อยู่'
     },
-    addressGroupDescription () {
-      return this.isEnglishLocale
-        ? 'The system loads your saved address first. You can choose another saved address or edit it manually.'
-        : 'ระบบจะดึงข้อมูลที่อยู่ของผู้ใช้มาก่อน และสามารถเลือกใช้ที่อยู่อื่นหรือแก้ไขเองได้'
-    },
     addressEditLabel () {
       return this.isEnglishLocale ? 'Edit' : 'แก้ไข'
     },
@@ -1177,9 +945,15 @@ export default {
         : 'กรุณาระบุอาหารที่แพ้หรือข้อควรระวังสำหรับการจัดอาหาร'
     },
     summarySchool () {
+      if (this.isEnglishLocale && textValue(this.form.schoolEnglish)) {
+        return textValue(this.form.schoolEnglish)
+      }
       return this.localizedSchoolName(this.form.school)
     },
     summaryProgram () {
+      if (this.isEnglishLocale && textValue(this.form.programEnglish)) {
+        return textValue(this.form.programEnglish)
+      }
       return this.localizedProgramName(this.form.program)
     },
     foodAllergySummaryLabel () {
@@ -1300,7 +1074,7 @@ export default {
       }))
     },
     requiredCompleted () {
-      const requiredFields = ['firstName', 'lastName', 'firstNamePronunciation', 'lastNamePronunciation', 'phone', 'school', 'program', 'ceremonyStatus', 'questionnaireEmploymentStatus']
+      const requiredFields = ['firstName', 'lastName', 'firstNamePronunciation', 'lastNamePronunciation', 'phone', 'school', 'program']
       let completed = requiredFields.filter(key => !!meaningfulOptionValue(this.form[key])).length
       if (this.requiresAssistanceType && meaningfulOptionValue(this.form.ceremonyAssistanceType)) completed += 1
       if (this.requiresCertificateDelivery && meaningfulOptionValue(this.form.certificateDeliveryMethod)) completed += 1
@@ -1310,7 +1084,7 @@ export default {
       return completed
     },
     completionPercent () {
-      let requiredTotal = 9
+      let requiredTotal = 7
       if (this.requiresAssistanceType) requiredTotal += 1
       if (this.requiresCertificateDelivery) requiredTotal += 1
       if (this.requiresCertificateShipping) requiredTotal += 2
@@ -1337,36 +1111,21 @@ export default {
       return !this.requiresFoodAllergyNote
     },
     addressFieldsInvalid () {
-      return ADDRESS_SOURCE_KEYS.some(addressKey => this.hasMissingRequiredAddressFields(this.form[addressKey])) ||
+      return ['homeAddress', 'currentAddress'].some(addressKey => this.hasMissingRequiredAddressFields(this.form[addressKey])) ||
         (this.requiresCertificateShipping && this.hasMissingRequiredAddressFields(this.form.certificateDeliveryAddress))
     },
     saveButtonDisabled () {
-      return this.saving || this.addressFieldsInvalid
+      return this.saving || this.addressFieldsInvalid || Object.keys(this.validationErrors).length > 0 || this.foodAllergyNoteInvalid
     },
     validationErrors () {
       const requiredMessage = this.$t('graduation.messages.requiredField')
       const errors = {}
-      ;['firstName', 'lastName', 'firstNamePronunciation', 'lastNamePronunciation', 'phone', 'school', 'program', 'questionnaireEmploymentStatus', 'ceremonyStatus']
+      ;['firstName', 'lastName', 'firstNamePronunciation', 'lastNamePronunciation', 'phone', 'school', 'program']
         .forEach(field => {
           if (!meaningfulOptionValue(this.form[field])) {
             errors[field] = requiredMessage
           }
         })
-      if (this.requiresAssistanceType && !meaningfulOptionValue(this.form.ceremonyAssistanceType)) {
-        errors.ceremonyAssistanceType = requiredMessage
-      }
-      if (this.requiresCertificateDelivery && !meaningfulOptionValue(this.form.certificateDeliveryMethod)) {
-        errors.certificateDeliveryMethod = this.$t('graduation.messages.selectCertificateMethod')
-      }
-      if (this.requiresCertificateShipping && !meaningfulOptionValue(this.form.certificateShippingService)) {
-        errors.certificateShippingService = this.$t('graduation.messages.selectShippingService')
-      }
-      if (this.requiresCertificateShipping && this.hasMissingRequiredAddressFields(this.form.certificateDeliveryAddress)) {
-        errors.certificateDeliveryAddress = this.$t('graduation.messages.enterCertificateAddress')
-      }
-      if (this.foodAllergyNoteInvalid) {
-        errors.foodAllergyNote = this.$t('graduation.messages.foodAllergyRequired')
-      }
       return errors
     }
   },
@@ -1582,6 +1341,7 @@ export default {
     },
     addressWithSaveDefaults (address) {
       const normalized = emptyAddress()
+      normalized.companyName = textValue(address && address.companyName)
       ADDRESS_FIELD_KEYS.forEach(field => {
         normalized[field] = this.addressValueForSave(address, field)
       })
@@ -1589,6 +1349,10 @@ export default {
     },
     prepareAddressForSave (addressKey) {
       if (!this.form[addressKey]) return
+      if (addressKey === 'workAddress') {
+        this.$set(this.form, addressKey, this.normalizedAddress(this.form[addressKey]))
+        return
+      }
       this.$set(this.form, addressKey, this.addressWithSaveDefaults(this.form[addressKey]))
     },
     prepareAddressFieldsForSave () {
@@ -1806,15 +1570,7 @@ export default {
       if (this.lastRegistrationLookupEmail === lookupKey) return
       this.lastRegistrationLookupEmail = lookupKey
       try {
-        const defaultResponse = await api.graduateRegistrations('defaults', studentCode
-          ? { studentCode, barcodeValue: studentCode }
-          : authEmail
-          ? { email: authEmail }
-          : {
-              phone: this.form.phone,
-              firstName: this.form.firstName,
-              lastName: this.form.lastName
-            })
+        const defaultResponse = await api.graduateRegistrations('defaults')
         const defaultRow = defaultResponse && defaultResponse.data ? defaultResponse.data.data : null
         if (defaultRow) {
           this.applyRegistrationDefaults(defaultRow)
@@ -2015,6 +1771,7 @@ export default {
         this.resetAddressEditing()
         this.validationAttempted = false
         notifySuccess(this.$store, this.$t('graduation.messages.saveSuccess'))
+        markGraduationStep(this.currentProfile, 'registrationSaved')
         return saved
       } catch (error) {
         this.persistLocalDraft()
@@ -2118,6 +1875,10 @@ export default {
       }
       if (this.requiresFaceCheckIn) {
         this.$router.push('/graduation/face-checkin')
+        return
+      }
+      if (this.$route.path !== '/graduation/register') {
+        this.$router.push('/graduation/register')
       }
     }
   }
@@ -2222,7 +1983,7 @@ export default {
 }
 .phone-field__control {
   display: grid;
-  grid-template-columns: minmax(150px, 1.2fr) 74px minmax(0, 1.4fr);
+  grid-template-columns: minmax(150px, 1fr) minmax(0, 1fr);
   gap: 8px;
   align-items: start;
 }
@@ -2234,21 +1995,6 @@ export default {
   min-width: 0;
   margin-bottom: 0;
 }
-.phone-dial-code {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: calc(1.5em + 0.75rem + 2px);
-  padding: 0.375rem 0.5rem;
-  border: 1px solid #d8dbe0;
-  border-radius: 0.25rem;
-  color: #3c4b64;
-  background: #fff;
-  font-weight: 400;
-  line-height: 1.5;
-  white-space: nowrap;
-}
-.phone-field.is-invalid .phone-dial-code,
 .phone-field.is-invalid .custom-select,
 .phone-field.is-invalid .form-control {
   border-color: #e55353;
@@ -2725,6 +2471,26 @@ export default {
   display: flex;
   margin-top: 12px;
 }
+.section-heading--separated {
+  margin-top: 0.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #e5e7eb;
+}
+.address-panel--home {
+  padding-top: 0;
+  border-top: 0;
+}
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+.form-actions .summary-save-button {
+  width: auto;
+  min-width: 220px;
+  padding-right: 2rem;
+  padding-left: 2rem;
+}
 .summary-save-button {
   display: inline-flex;
   align-items: center;
@@ -2743,21 +2509,32 @@ export default {
   background: #751111;
   box-shadow: 0 12px 26px rgba(140, 21, 21, 0.3);
 }
+.summary-save-button:disabled,
+.summary-save-button.disabled {
+  border-color: #b76a6a;
+  background: #b76a6a;
+  box-shadow: 0 4px 10px rgba(140, 21, 21, 0.12);
+  cursor: not-allowed;
+  opacity: 0.78;
+}
 @media (max-width: 768px) {
   .registration-header,
   .registration-header__actions {
     flex-direction: column;
   }
   .shipping-rate-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (max-width: 575px) {
-  .phone-field__control {
-    grid-template-columns: 1fr 74px;
+  .shipping-rate-card {
+    min-height: 150px;
+    padding: 12px 34px 12px 10px;
   }
-  .phone-local-input {
-    grid-column: 1 / -1;
+  .shipping-rate-card strong { font-size: 13px; }
+  .shipping-rate-card span { font-size: 11px; }
+  .phone-field__control {
+    grid-template-columns: 1fr;
   }
 }
 </style>

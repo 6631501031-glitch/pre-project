@@ -6,7 +6,7 @@
       :show="show"
       @update:show="(value) => $store.commit('set', ['sidebarShow', value])"
   >
-    <CSidebarBrand class="d-md-down-none" >
+    <CSidebarBrand>
 <!--      <CIcon-->
 <!--          class="c-sidebar-brand-full"-->
 <!--          name="logo"-->
@@ -47,10 +47,23 @@
 
 <script>
 import buildNav from './_nav'
+import {
+  getGraduationProgress,
+  isFaceRegistrationEnabled,
+  WORKFLOW_PROGRESS_EVENT
+} from '@/projects/utils/graduation-workflow-progress'
 
 export default {
   name: 'TheSidebar',
+  data() {
+    return {
+      graduationProgress: {}
+    }
+  },
   computed: {
+    currentProfile() {
+      return this.$store.getters['auth/profile'] || {}
+    },
     permissionLoaded() {
       return this.$store.getters['security/loaded']
     },
@@ -61,7 +74,18 @@ export default {
     navs() {
       this.$i18n.locale
       const navConfig = buildNav(this.$t.bind(this))
-      return this.filterNavTree(navConfig)
+      const filtered = this.filterNavTree(navConfig)
+      const faceEnabled = isFaceRegistrationEnabled(this.graduationProgress)
+      filtered.forEach(group => {
+        const children = Array.isArray(group && group._children) ? group._children : []
+        children.forEach(item => {
+          if (item && item.to === '/graduation/face-checkin') {
+            item.disabled = !faceEnabled
+            item.addLinkClasses = !faceEnabled ? 'graduation-face-link--disabled' : ''
+          }
+        })
+      })
+      return filtered
     },
     show() {
       return this.$store.state.sidebarShow
@@ -71,6 +95,15 @@ export default {
     }
   },
   watch: {
+    '$route.path'() {
+      this.refreshGraduationProgress()
+    },
+    currentProfile: {
+      handler() {
+        this.refreshGraduationProgress()
+      },
+      deep: true
+    },
     '$store.state.XAccessToken': {
       async handler(value) {
         if (!value) return
@@ -84,7 +117,18 @@ export default {
       immediate: true
     }
   },
+  mounted() {
+    this.refreshGraduationProgress()
+    window.addEventListener(WORKFLOW_PROGRESS_EVENT, this.refreshGraduationProgress)
+  },
+  beforeDestroy() {
+    window.removeEventListener(WORKFLOW_PROGRESS_EVENT, this.refreshGraduationProgress)
+  },
   methods: {
+    refreshGraduationProgress() {
+      const profile = this.$store.getters['auth/profile'] || {}
+      this.graduationProgress = getGraduationProgress(profile)
+    },
     normalizePermissionPath(path) {
       if (!path) return ''
       let normalized = String(path).trim()
@@ -172,5 +216,9 @@ export default {
 <style>
 .bg-style1{
   background: linear-gradient(30deg,#FEC260 0%,#8c1515 60%);
+}
+.graduation-face-link--disabled {
+  cursor: not-allowed !important;
+  opacity: 0.45;
 }
 </style>

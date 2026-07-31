@@ -116,6 +116,7 @@ function cleanYesNo(value, note) {
 function cleanAddress(value) {
   const source = value && typeof value === 'object' ? value : {};
   return {
+    companyName: cleanText(source.companyName),
     houseNo: cleanText(source.houseNo),
     moo: cleanText(source.moo),
     soi: cleanText(source.soi),
@@ -256,12 +257,59 @@ function accountIdentityDefaults(request) {
     lastName: initial.lastName || firstAccountText(account.lastName, userinfo.lastName, snapshot.lastName, account.familyName, userinfo.familyName),
     email: initial.email || emails[0] || null,
     studentCode: initial.studentCode || initial.barcodeValue || studentCodes[0] || null,
-    school: initial.school || null,
+    school: initial.school || firstAccountText(
+      account.school,
+      account.faculty,
+      account.schoolName,
+      account.facultyName,
+      userinfo.school,
+      userinfo.faculty,
+      snapshot.school,
+      snapshot.faculty,
+      snapshot.orgGroupName
+    ),
     schoolEnglish: initial.schoolEnglish || null,
-    program: initial.program || null,
+    program: initial.program || firstAccountText(
+      account.program,
+      account.major,
+      account.programName,
+      account.majorName,
+      userinfo.program,
+      userinfo.major,
+      snapshot.program,
+      snapshot.major,
+      snapshot.subUnitName,
+      snapshot.orgUnitName
+    ),
     programEnglish: initial.programEnglish || null,
     phone: initial.phone || null
   };
+}
+
+function registrationWithAccountDefaults(row, request) {
+  const item = Object.assign({}, row || {});
+  const identity = accountIdentityDefaults(request || {});
+  ['firstName', 'lastName', 'email', 'studentCode', 'school', 'schoolEnglish', 'program', 'programEnglish', 'phone'].forEach(function (field) {
+    if (!cleanText(item[field]) && cleanText(identity[field])) item[field] = identity[field];
+  });
+  if (!cleanText(item.barcodeValue) && cleanText(identity.studentCode)) item.barcodeValue = identity.studentCode;
+  return serializeRegistration(item);
+}
+
+function meaningfulAddressText(value) {
+  const normalized = cleanText(value);
+  return normalized && normalized !== '-' ? normalized : null;
+}
+
+function mergeAddressDefaults(target, source) {
+  const merged = Object.assign({}, target && typeof target === 'object' ? target : {});
+  const fallback = source && typeof source === 'object' ? source : {};
+  ['companyName', 'houseNo', 'moo', 'soi', 'road', 'subdistrict', 'district', 'province', 'postalCode'].forEach(function (field) {
+    if (!meaningfulAddressText(merged[field]) && meaningfulAddressText(fallback[field])) {
+      merged[field] = fallback[field];
+    }
+  });
+  return merged;
 }
 
 function applyAccountIdentity(payload, request) {
@@ -353,9 +401,6 @@ function payloadFromBody(body) {
 
 function validatePayload(payload) {
   const missing = [];
-  if (!payload.questionnaireEmploymentStatus) {
-    missing.push('questionnaireEmploymentStatus');
-  }
   if (payload.hasFoodAllergy === 'yes' && !isMeaningfulFoodAllergyNote(payload.foodAllergyNote)) {
     missing.push('foodAllergyNote');
   }
@@ -492,36 +537,48 @@ exports.options = async function options() {
   return { schools: schools };
 };
 
-exports.defaultsForAccount = async function defaultsForAccount(request, query) {
+exports.defaultsForAccount = async function defaultsForAccount(request) {
   const identity = accountIdentityDefaults(request || {});
-  if (identity.accountId) {
-    const accountRow = await GraduateRegistration.findOne({ accountId: identity.accountId })
-      .sort({ updatedAt: -1 })
-      .lean();
-    if (accountRow) return serializeRegistration(accountRow);
-  }
-
-  const studentCodeTerms = accountStudentCodeTerms(request || {}, query || {});
+  // Defaults must only use identity values from the authenticated account.
+  // Never trust a student code or email supplied by the browser for this lookup.
+  const studentCodeTerms = accountStudentCodeTerms(request || {}, {});
+  const emailTerms = accountEmailTerms(request || {}, {});
+  const ownership = [];
+  if (identity.accountId) ownership.push({ accountId: identity.accountId });
   if (studentCodeTerms.length) {
-    const exactStudentRow = await GraduateRegistration.findOne({ $or: [{ studentCode: { $in: studentCodeTerms } }, { barcodeValue: { $in: studentCodeTerms } }] })
-      .sort({ updatedAt: -1 })
-      .lean();
-    if (exactStudentRow) return serializeRegistration(exactStudentRow);
+    ownership.push({ studentCode: { $in: studentCodeTerms } });
+    ownership.push({ barcodeValue: { $in: studentCodeTerms } });
   }
+  // Student code is the authoritative owner key. Email is only a fallback for
+  // accounts that do not have a student code, because legacy rows can contain
+  // reused or incorrect email values.
+  if (!studentCodeTerms.length && emailTerms.length) ownership.push({ email: { $in: emailTerms } });
 
-  const emailTerms = accountEmailTerms(request || {}, query || {});
-  if (emailTerms.length) {
-    const exactEmailRow = await GraduateRegistration.findOne({ email: { $in: emailTerms } })
+  if (ownership.length) {
+    const ownedRows = await GraduateRegistration.find({ $or: ownership })
       .sort({ updatedAt: -1 })
+      .limit(25)
       .lean();
-    if (exactEmailRow) return serializeRegistration(exactEmailRow);
+    if (ownedRows.length) {
+      const merged = Object.assign({}, ownedRows[0]);
+      const reusableFields = ['school', 'schoolEnglish', 'program', 'programEnglish'];
+      ownedRows.slice(1).forEach(function (row) {
+        reusableFields.forEach(function (field) {
+          if (!cleanText(merged[field]) && cleanText(row[field])) merged[field] = row[field];
+        });
+        merged.homeAddress = mergeAddressDefaults(merged.homeAddress, row.homeAddress);
+        merged.currentAddress = mergeAddressDefaults(merged.currentAddress, row.currentAddress);
+        merged.workAddress = mergeAddressDefaults(merged.workAddress, row.workAddress);
+      });
+      return registrationWithAccountDefaults(merged, request);
+    }
   }
 
   const initial = registrationFromInitialRecord(initialRecordForAccount(request || {}));
   if (initial) {
     const identity = accountIdentityDefaults(request || {});
     initial.accountId = identity.accountId;
-    return serializeRegistration(initial);
+    return registrationWithAccountDefaults(initial, request);
   }
 
   return null;
