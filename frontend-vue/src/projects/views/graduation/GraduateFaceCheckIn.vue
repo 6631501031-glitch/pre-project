@@ -2,7 +2,7 @@
   <div class="face-registration-page">
     <div class="page-header">
       <div>
-        <span class="page-header__step">ขั้นตอนสุดท้าย</span>
+        <span class="page-header__step">ขั้นตอนที่ 4 จาก 4</span>
         <h1>ลงทะเบียนใบหน้า</h1>
         <p>ถ่ายภาพใบหน้าให้ชัดเจน เพื่อใช้ยืนยันตัวตนในวันเข้ารับพระราชทานปริญญาบัตร</p>
       </div>
@@ -15,12 +15,22 @@
     <div class="progress-steps" aria-label="ขั้นตอนการลงทะเบียน">
       <div class="progress-step progress-step--done">
         <span><CIcon name="cil-check" /></span>
-        <div><small>ขั้นตอนที่ 1</small><strong>แจ้งความประสงค์</strong></div>
+        <div><small>ขั้นตอนที่ 1</small><strong>แบบสอบถาม</strong></div>
+      </div>
+      <div class="progress-line"></div>
+      <div class="progress-step progress-step--done">
+        <span><CIcon name="cil-check" /></span>
+        <div><small>ขั้นตอนที่ 2</small><strong>แจ้งความประสงค์</strong></div>
+      </div>
+      <div class="progress-line"></div>
+      <div class="progress-step progress-step--done">
+        <span><CIcon name="cil-check" /></span>
+        <div><small>ขั้นตอนที่ 3</small><strong>ข้อมูลการเข้ารับ</strong></div>
       </div>
       <div class="progress-line"></div>
       <div class="progress-step progress-step--active">
-        <span>2</span>
-        <div><small>ขั้นตอนที่ 2</small><strong>ลงทะเบียนใบหน้า</strong></div>
+        <span>4</span>
+        <div><small>ขั้นตอนที่ 4</small><strong>ลงทะเบียนใบหน้า</strong></div>
       </div>
     </div>
 
@@ -111,7 +121,7 @@
 
 <script>
 import api from '@/service/api'
-import { getGraduationProgress, isFaceRegistrationEnabled } from '@/projects/utils/graduation-workflow-progress'
+import { getGraduationProgress, isFaceRegistrationEnabled, markGraduationStep } from '@/projects/utils/graduation-workflow-progress'
 
 const STORAGE_KEY = 'graduate-self-registration-draft'
 const FACE_CHECKIN_STATUSES = ['10', '20', '30', '40']
@@ -272,7 +282,11 @@ export default {
       const payload = Object.assign({}, draftPayload && draftPayload.form ? draftPayload.form : this.form, {
         _id: this.registrationId, email: this.authEmail || normalizeEmailText(this.form.email), barcodeValue: this.barcodeValue, facePhoto: this.photoPreview
       })
-      try { await api.graduateRegistrations('update', payload); this.saveSuccess = true } catch (error) {
+      try {
+        await api.graduateRegistrations('update', payload)
+        this.saveSuccess = true
+        markGraduationStep(this.currentProfile, 'faceSaved')
+      } catch (error) {
         this.saveSuccess = false; this.cameraError = 'บันทึกรูปใบหน้าลงระบบไม่สำเร็จ กรุณาลองถ่ายและบันทึกใหม่อีกครั้ง'
       }
     },
@@ -287,7 +301,7 @@ export default {
 .page-header__step { display: inline-block; margin-bottom: 4px; color: #8c1515; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .page-header h1 { margin: 0; color: #1f2937; font-size: 30px; font-weight: 700; }
 .page-header p { margin: 6px 0 0; color: #6b7280; }
-.progress-steps { display: flex; align-items: center; max-width: 600px; margin: 0 auto 24px; }
+.progress-steps { display: flex; align-items: center; max-width: 980px; margin: 0 auto 24px; }
 .progress-step { display: flex; align-items: center; gap: 10px; color: #6b7280; white-space: nowrap; }
 .progress-step > span { display: grid; width: 34px; height: 34px; place-items: center; border: 2px solid #d1d5db; border-radius: 50%; font-weight: 700; }
 .progress-step div { display: grid; }.progress-step small { font-size: 11px; }.progress-step strong { color: #374151; font-size: 13px; }

@@ -400,9 +400,9 @@ const SCHOOL_PROGRAM_CATALOG = [
       {
         "departmentId": "1302",
         "program": "สาขาวิชาวิทยาการคอมพิวเตอร์",
-        "programEnglish": "Computer",
+        "programEnglish": "Computer Science",
         "labelTh": "สาขาวิชาวิทยาการคอมพิวเตอร์",
-        "labelEn": "Computer"
+        "labelEn": "Computer Science"
       },
       {
         "departmentId": "1303",
@@ -435,9 +435,9 @@ const SCHOOL_PROGRAM_CATALOG = [
       {
         "departmentId": "1501",
         "program": "สาขาวิชาวิศวกรรมคอมพิวเตอร์",
-        "programEnglish": "Computer",
+        "programEnglish": "Computer Engineering",
         "labelTh": "สาขาวิชาวิศวกรรมคอมพิวเตอร์",
-        "labelEn": "Computer"
+        "labelEn": "Computer Engineering"
       },
       {
         "departmentId": "1502",

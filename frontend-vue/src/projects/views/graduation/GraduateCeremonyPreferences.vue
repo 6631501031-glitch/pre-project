@@ -1,6 +1,7 @@
 <template>
   <div class="ceremony-page">
     <div class="ceremony-header">
+      <div class="ceremony-header__step">{{ stepLabel }}</div>
       <h1>{{ pageTitle }}</h1>
     </div>
 
@@ -82,7 +83,7 @@
               <div class="delivery-address" :class="{ 'is-invalid': errorFor('certificateDeliveryAddress') }">
                 <h3>{{ $t('graduation.certificate.deliveryAddress') }}<span class="required-mark">*</span></h3>
                 <fieldset class="address-source-field" :class="{ 'is-invalid': errorFor('certificateAddressSource') }">
-                  <legend>เลือกที่อยู่ที่ต้องการใช้<span class="required-mark">*</span></legend>
+                  <legend>{{ addressSourceLegend }}<span class="required-mark">*</span></legend>
                   <div class="address-source-options">
                     <button
                       v-for="option in addressSourceOptions"
@@ -171,7 +172,8 @@ import { notifyError, notifySuccess } from '@/projects/utils/notify'
 import {
   getGraduationProgress,
   isFaceRegistrationEnabled,
-  markGraduationStep
+  markGraduationStep,
+  updateGraduationProgress
 } from '@/projects/utils/graduation-workflow-progress'
 
 const emptyAddress = () => ({
@@ -219,6 +221,11 @@ export default {
       return String((this.$i18n && this.$i18n.locale) || '').toLowerCase().startsWith('en')
     },
     pageTitle () { return this.isEnglish ? 'Degree Ceremony Attendance' : 'การเข้ารับพระราชทานปริญญาบัตร' },
+    stepLabel () {
+      const attends = ['10', '20', '30', '40'].includes(this.form.ceremonyStatus)
+      const total = attends ? 4 : 3
+      return this.isEnglish ? `Step 3 of ${total}` : `ขั้นตอนที่ 3 จาก ${total}`
+    },
     requiredLabel () { return this.isEnglish ? 'Please complete this field.' : 'กรุณาระบุข้อมูล' },
     saveLabel () { return this.isEnglish ? 'Save information' : 'บันทึกข้อมูล' },
     savingLabel () { return this.isEnglish ? 'Saving...' : 'กำลังบันทึก...' },
@@ -267,10 +274,25 @@ export default {
     },
     addressSourceOptions () {
       return [
-        { value: 'homeAddress', label: 'ที่อยู่ตามทะเบียนบ้าน', icon: 'cil-home' },
-        { value: 'currentAddress', label: 'ที่อยู่ปัจจุบัน', icon: 'cil-location-pin' },
-        { value: 'workAddress', label: 'ที่อยู่ที่ทำงาน', icon: 'cil-building' }
+        {
+          value: 'homeAddress',
+          label: this.isEnglish ? 'Registered address' : 'ที่อยู่ตามทะเบียนบ้าน',
+          icon: 'cil-home'
+        },
+        {
+          value: 'currentAddress',
+          label: this.isEnglish ? 'Current address' : 'ที่อยู่ปัจจุบัน',
+          icon: 'cil-location-pin'
+        },
+        {
+          value: 'workAddress',
+          label: this.isEnglish ? 'Work address' : 'ที่อยู่ที่ทำงาน',
+          icon: 'cil-building'
+        }
       ]
+    },
+    addressSourceLegend () {
+      return this.isEnglish ? 'Select the address to use' : 'เลือกที่อยู่ที่ต้องการใช้'
     },
     yesNoOptions () {
       return [
@@ -352,6 +374,10 @@ export default {
     },
     onCeremonyStatusChange (value) {
       this.form.ceremonyStatus = this.normalizeCode(value)
+      updateGraduationProgress(this.currentProfile, {
+        ceremonySaved: false,
+        ceremonyStatus: this.form.ceremonyStatus
+      })
       if (!this.requiresAssistanceType) this.form.ceremonyAssistanceType = ''
       if (!this.requiresCertificateDelivery) {
         this.form.certificateDeliveryMethod = ''
@@ -385,6 +411,10 @@ export default {
           certificateDeliveryAddress: Object.assign(emptyAddress(), row && row.certificateDeliveryAddress),
           hasFoodAllergy: row && row.hasFoodAllergy === 'yes' ? 'yes' : 'no',
           foodAllergyNote: this.meaningfulText(row && row.foodAllergyNote)
+        })
+        updateGraduationProgress(this.currentProfile, {
+          ceremonySaved: !!this.form.ceremonyStatus,
+          ceremonyStatus: this.form.ceremonyStatus
         })
       } catch (error) {
         notifyError(this.$store, this.isEnglish ? 'Unable to load information.' : 'ไม่สามารถโหลดข้อมูลได้')
@@ -425,6 +455,16 @@ export default {
 <style scoped>
 .ceremony-page { padding: 0.25rem; }
 .ceremony-header { margin-bottom: 20px; }
+.ceremony-header__step {
+  display: inline-flex;
+  margin-bottom: 8px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  color: #8c1515;
+  background: #fff0f0;
+  font-size: 12px;
+  font-weight: 700;
+}
 .ceremony-header h1 {
   margin: 0;
   color: #1f2937;
@@ -646,7 +686,39 @@ export default {
     height: 22px;
     font-size: 13px;
   }
-  .address-source-options { grid-template-columns: 1fr; }
+  .address-source-options {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.45rem;
+  }
+  .address-source-option {
+    min-width: 0;
+    min-height: 118px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 1.7rem 0.4rem 0.75rem;
+    text-align: center;
+  }
+  .address-source-option > .c-icon {
+    width: 24px;
+    height: 24px;
+    margin-right: 0;
+  }
+  .address-source-option strong {
+    width: 100%;
+    overflow-wrap: anywhere;
+    font-size: 0.7rem;
+    line-height: 1.35;
+  }
+  .address-source-option__check {
+    top: 0.5rem;
+    right: 0.5rem;
+    width: 19px;
+    height: 19px;
+    transform: none;
+    font-size: 11px;
+  }
 }
 .delivery-address { margin-top: 1rem; }
 .food-allergy-note--readonly ::v-deep textarea {

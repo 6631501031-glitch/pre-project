@@ -2,12 +2,13 @@
   <div class="graduate-registration-page">
     <div class="registration-header">
       <div>
+        <div class="registration-header__eyebrow">{{ registrationStepLabel }}</div>
         <h1>{{ $t('graduation.self.title') }}</h1>
       </div>
     </div>
 
     <CRow>
-      <CCol lg="12" class="mb-3">
+      <CCol lg="9" class="mb-3">
         <CCard class="registration-card">
           <CCardBody>
             <div class="section-heading">
@@ -137,9 +138,14 @@
                 :address="form.currentAddress"
                 :required="true"
                 :show-required-mark="false"
-                :readonly="false"
+                :readonly="currentAddressSameAsHome"
+                :allow-edit="false"
+                :show-same-address-control="true"
+                :same-address-checked="currentAddressSameAsHome"
+                :same-address-label="currentAddressSameAsHomeLabel"
                 :hide-save="true"
                 :source-options="[]"
+                @toggle-same-address="toggleCurrentAddressSameAsHome"
               />
             </div>
             <div class="address-panel">
@@ -164,6 +170,35 @@
         </div>
       </CCol>
 
+      <CCol lg="3" class="mb-3">
+        <aside class="face-preview-panel">
+          <div class="face-preview-panel__heading">
+            <span class="face-preview-panel__icon"><CIcon name="cil-camera" /></span>
+            <div>
+              <h2>{{ facePanelTitle }}</h2>
+              <p>{{ facePanelSubtitle }}</p>
+            </div>
+          </div>
+
+          <div v-if="savedFacePhoto" class="face-preview-panel__photo">
+            <img :src="savedFacePhoto" :alt="facePhotoAlt">
+            <span class="face-preview-panel__status face-preview-panel__status--success">
+              <CIcon name="cil-check-circle" /> {{ faceSavedLabel }}
+            </span>
+          </div>
+          <div v-else class="face-preview-panel__empty">
+            <span><CIcon name="cil-user" /></span>
+            <strong>{{ faceNotSavedLabel }}</strong>
+            <small>{{ faceNotSavedHint }}</small>
+          </div>
+
+          <div class="face-preview-panel__identity">
+            <span>{{ fullName || '-' }}</span>
+            <small>{{ authStudentCode || currentRegistrationBarcodeValue || '-' }}</small>
+          </div>
+        </aside>
+      </CCol>
+
     </CRow>
   </div>
 </template>
@@ -171,7 +206,7 @@
 <script>
 import api from '@/service/api'
 import { notifyError, notifySuccess } from '@/projects/utils/notify'
-import { markGraduationStep } from '@/projects/utils/graduation-workflow-progress'
+import { getGraduationProgress, graduationStepTotal, markGraduationStep } from '@/projects/utils/graduation-workflow-progress'
 import SCHOOL_PROGRAM_CATALOG from './school-program-catalog'
 import GRADUATE_INITIAL_CATALOG from './graduate-initial-catalog'
 
@@ -708,6 +743,10 @@ export default {
         title: { type: String, required: true },
         address: { type: Object, required: true },
         readonly: { type: Boolean, default: false },
+        allowEdit: { type: Boolean, default: true },
+        showSameAddressControl: { type: Boolean, default: false },
+        sameAddressChecked: { type: Boolean, default: false },
+        sameAddressLabel: { type: String, default: '' },
         required: { type: Boolean, default: false },
         showRequiredMark: { type: Boolean, default: true },
         hideSave: { type: Boolean, default: false },
@@ -723,8 +762,20 @@ export default {
         <div class="address-block" :class="{ 'readonly-white': readonly }">
           <div class="address-subsection">
             <span>{{ title }}<span v-if="required && showRequiredMark" class="required-mark">*</span></span>
+            <label
+              v-if="showSameAddressControl"
+              class="same-address-checkbox"
+              :class="{ 'same-address-checkbox--checked': sameAddressChecked }"
+            >
+              <input
+                type="checkbox"
+                :checked="sameAddressChecked"
+                @change="$emit('toggle-same-address', $event.target.checked)"
+              >
+              <span>{{ sameAddressLabel }}</span>
+            </label>
             <CButton
-              v-if="readonly"
+              v-if="readonly && allowEdit"
               color="primary"
               variant="outline"
               size="sm"
@@ -845,6 +896,9 @@ export default {
       phoneCountry: 'TH',
       phoneLocalNumber: '',
       lockedFields: {},
+      currentAddressSameAsHome: false,
+      currentAddressBeforeHomeCopy: null,
+      mongoCurrentAddress: null,
       addressEditing: {
         homeAddress: false,
         currentAddress: false,
@@ -856,6 +910,7 @@ export default {
       loadedDraftStorageKey: '',
       currentRegistrationId: '',
       currentRegistrationBarcodeValue: '',
+      savedFacePhoto: '',
       saving: false,
       foodAllergyAlertShown: false,
       validationAttempted: false
@@ -910,8 +965,35 @@ export default {
     isEnglishLocale () {
       return String((this.$i18n && this.$i18n.locale) || '').toLowerCase().startsWith('en')
     },
+    facePanelTitle () {
+      return this.isEnglishLocale ? 'Facial registration' : 'รูปใบหน้าสำหรับลงทะเบียน'
+    },
+    facePanelSubtitle () {
+      return this.isEnglishLocale ? 'Your latest saved photo' : 'แสดงภาพล่าสุดที่บันทึกในระบบ'
+    },
+    facePhotoAlt () {
+      return this.isEnglishLocale ? 'Registered face' : 'รูปใบหน้าที่ลงทะเบียน'
+    },
+    faceSavedLabel () {
+      return this.isEnglishLocale ? 'Photo saved' : 'บันทึกภาพแล้ว'
+    },
+    faceNotSavedLabel () {
+      return this.isEnglishLocale ? 'No face photo yet' : 'ยังไม่มีรูปใบหน้า'
+    },
+    faceNotSavedHint () {
+      return this.isEnglishLocale ? 'The photo will appear here after facial registration.' : 'รูปจะแสดงที่นี่หลังลงทะเบียนใบหน้าสำเร็จ'
+    },
+    registrationStepLabel () {
+      const total = graduationStepTotal(getGraduationProgress(this.currentProfile))
+      return this.isEnglishLocale ? `Step 2 of ${total}` : `ขั้นตอนที่ 2 จาก ${total}`
+    },
     addressGroupTitle () {
       return this.isEnglishLocale ? 'Address information' : 'ข้อมูลที่อยู่'
+    },
+    currentAddressSameAsHomeLabel () {
+      return this.isEnglishLocale
+        ? 'Use the registered address as the current address'
+        : 'ใช้ที่อยู่ตามทะเบียนบ้านเป็นที่อยู่ปัจจุบัน'
     },
     addressEditLabel () {
       return this.isEnglishLocale ? 'Edit' : 'แก้ไข'
@@ -951,8 +1033,11 @@ export default {
       return this.localizedSchoolName(this.form.school)
     },
     summaryProgram () {
-      if (this.isEnglishLocale && textValue(this.form.programEnglish)) {
-        return textValue(this.form.programEnglish)
+      if (this.isEnglishLocale) {
+        const catalogProgram = this.findCatalogProgram(this.form.school, this.form.program)
+        const catalogEnglish = textValue(catalogProgram && (catalogProgram.programEnglish || catalogProgram.labelEn))
+        if (catalogEnglish) return catalogEnglish
+        if (textValue(this.form.programEnglish)) return textValue(this.form.programEnglish)
       }
       return this.localizedProgramName(this.form.program)
     },
@@ -1136,6 +1221,13 @@ export default {
     this.fetchRegistrationDefaults()
   },
   watch: {
+    'form.homeAddress': {
+      handler () {
+        if (!this.currentAddressSameAsHome) return
+        this.copyHomeAddressToCurrent()
+      },
+      deep: true
+    },
     currentProfile: {
       handler () {
         this.restoreDraft()
@@ -1219,6 +1311,27 @@ export default {
     }
   },
   methods: {
+    copyHomeAddressToCurrent () {
+      this.$set(this.form, 'currentAddress', Object.assign(emptyAddress(), this.normalizedAddress(this.form.homeAddress)))
+    },
+    toggleCurrentAddressSameAsHome (checked) {
+      const nextChecked = !!checked
+      if (nextChecked && !this.currentAddressSameAsHome) {
+        this.currentAddressBeforeHomeCopy = Object.assign(emptyAddress(), this.normalizedAddress(this.form.currentAddress))
+      }
+      this.currentAddressSameAsHome = nextChecked
+      if (nextChecked) {
+        this.copyHomeAddressToCurrent()
+      } else {
+        const addressToRestore = this.currentAddressBeforeHomeCopy ||
+          (this.hasAnyAddressValue(this.mongoCurrentAddress) ? this.mongoCurrentAddress : null)
+        if (addressToRestore) {
+          this.$set(this.form, 'currentAddress', Object.assign(emptyAddress(), addressToRestore))
+        }
+        this.currentAddressBeforeHomeCopy = null
+      }
+      this.persistLocalDraft()
+    },
     isLockedField (field) {
       if (field === 'firstName' || field === 'lastName') return true
       return !!(this.lockedFields && this.lockedFields[field])
@@ -1329,6 +1442,11 @@ export default {
         normalized[field] = textValue(address && address[field])
       })
       return normalized
+    },
+    addressesMatch (left, right) {
+      const normalizedLeft = this.normalizedAddress(left)
+      const normalizedRight = this.normalizedAddress(right)
+      return ADDRESS_FIELD_KEYS.every(field => normalizedLeft[field] === normalizedRight[field])
     },
     hasMissingRequiredAddressFields (address) {
       return hasMissingRequiredAddressFields(address)
@@ -1496,6 +1614,12 @@ export default {
       const school = textValue(registration && registration.school) || normalizeSchoolName(registration && registration.school)
       this.currentRegistrationId = textValue(registration && (registration._id || registration.id))
       this.currentRegistrationBarcodeValue = textValue(registration && registration.barcodeValue)
+      this.savedFacePhoto = textValue(registration && registration.facePhoto)
+      this.mongoCurrentAddress = this.normalizedAddress(registration && registration.currentAddress)
+      this.currentAddressSameAsHome = registration && registration.currentAddressSameAsHome === true
+      this.currentAddressBeforeHomeCopy = registration && this.hasAnyAddressValue(registration.currentAddressBeforeHomeCopy)
+        ? this.normalizedAddress(registration.currentAddressBeforeHomeCopy)
+        : null
       this.applyDefaults({
         firstName: textValue(registration && registration.firstName),
         lastName: textValue(registration && registration.lastName),
@@ -1511,6 +1635,9 @@ export default {
       this.form.questionnaireEmploymentStatus = meaningfulOptionValue(registration && registration.questionnaireEmploymentStatus)
       this.form.questionnaireNote = textValue(registration && registration.questionnaireNote)
       this.applyAddressDefaults(registration)
+      if (this.currentAddressSameAsHome) {
+        this.copyHomeAddressToCurrent()
+      }
       this.applyFixedGraduateName()
     },
     applyDefaults (defaults, options = {}) {
@@ -1709,6 +1836,8 @@ export default {
         programEnglish: textValue(programItem && (programItem.programEnglish || programItem.labelEn)) || textValue(this.form.programEnglish),
         questionnaireEmploymentStatus: meaningfulOptionValue(this.form.questionnaireEmploymentStatus),
         questionnaireNote: textValue(this.form.questionnaireNote),
+        currentAddressSameAsHome: this.currentAddressSameAsHome,
+        currentAddressBeforeHomeCopy: this.currentAddressBeforeHomeCopy || emptyAddress(),
         hasFoodAllergy,
         foodAllergyNote: hasFoodAllergy === 'yes' ? this.form.foodAllergyNote : '',
         barcodeValue: this.currentRegistrationBarcodeValue || initialDefaults.studentCode || this.authStudentCode || this.barcodeValue
@@ -1734,6 +1863,8 @@ export default {
         }),
         barcodeValue: savedBarcode,
         currentRegistrationId: savedId,
+        currentAddressSameAsHome: this.currentAddressSameAsHome,
+        currentAddressBeforeHomeCopy: this.currentAddressBeforeHomeCopy,
         savedAt: new Date().toISOString()
       }
       window.localStorage.setItem(this.draftStorageKey, JSON.stringify(payload))
@@ -1767,6 +1898,9 @@ export default {
           response = await api.graduateRegistrations('create', payload)
         }
         const saved = response && response.data && response.data.data ? response.data.data : null
+        if (saved && !this.currentAddressSameAsHome) {
+          this.mongoCurrentAddress = this.normalizedAddress(saved.currentAddress)
+        }
         this.persistLocalDraft(saved)
         this.resetAddressEditing()
         this.validationAttempted = false
@@ -1790,14 +1924,22 @@ export default {
         if (!raw) {
           this.form = cloneForm()
           this.lockedFields = {}
+          this.currentAddressSameAsHome = false
+          this.currentAddressBeforeHomeCopy = null
+          this.mongoCurrentAddress = null
           this.syncPhonePartsFromPhone('')
           this.applyFixedGraduateName()
           this.currentRegistrationId = ''
           this.currentRegistrationBarcodeValue = ''
+          this.savedFacePhoto = ''
           return
         }
         const payload = JSON.parse(raw)
         const restored = Object.assign(cloneForm(), payload.form || {})
+        this.currentAddressSameAsHome = payload.currentAddressSameAsHome === true
+        this.currentAddressBeforeHomeCopy = payload.currentAddressBeforeHomeCopy
+          ? Object.assign(emptyAddress(), payload.currentAddressBeforeHomeCopy)
+          : null
         this.currentRegistrationId = textValue(payload.currentRegistrationId)
         this.currentRegistrationBarcodeValue = textValue(payload.barcodeValue)
         if ((!restored.firstNamePronunciation || !restored.lastNamePronunciation) && restored.namePronunciation) {
@@ -1837,14 +1979,21 @@ export default {
           restored.foodAllergyNote = ''
         }
         this.form = restored
+        if (this.currentAddressSameAsHome) {
+          this.copyHomeAddressToCurrent()
+        }
         this.syncPhonePartsFromPhone(this.form.phone)
         this.applyFixedGraduateName()
       } catch (error) {
         this.form = cloneForm()
+        this.currentAddressSameAsHome = false
+        this.currentAddressBeforeHomeCopy = null
+        this.mongoCurrentAddress = null
         this.syncPhonePartsFromPhone('')
         this.applyFixedGraduateName()
         this.currentRegistrationId = ''
         this.currentRegistrationBarcodeValue = ''
+        this.savedFacePhoto = ''
       }
     },
     clearAllData () {
@@ -1853,10 +2002,14 @@ export default {
       }
       this.form = cloneForm()
       this.lockedFields = {}
+      this.currentAddressSameAsHome = false
+      this.currentAddressBeforeHomeCopy = null
+      this.mongoCurrentAddress = null
       this.syncPhonePartsFromPhone('')
       this.applyFixedGraduateName()
       this.currentRegistrationId = ''
       this.currentRegistrationBarcodeValue = ''
+      this.savedFacePhoto = ''
       this.resetAddressEditing()
       this.foodAllergyAlertShown = false
       this.validationAttempted = false
@@ -1873,13 +2026,7 @@ export default {
       } catch (error) {
         return
       }
-      if (this.requiresFaceCheckIn) {
-        this.$router.push('/graduation/face-checkin')
-        return
-      }
-      if (this.$route.path !== '/graduation/register') {
-        this.$router.push('/graduation/register')
-      }
+      this.$router.push('/graduation/ceremony-preferences')
     }
   }
 }
@@ -1908,11 +2055,16 @@ export default {
   color: #6b7280;
 }
 .registration-header__eyebrow {
-  margin-bottom: 4px;
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 8px;
+  padding: 5px 11px;
+  border-radius: 999px;
   color: #8c1515;
+  background: #fff0f0;
   font-size: 12px;
   font-weight: 700;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 .registration-header__actions {
   display: flex;
@@ -1926,6 +2078,136 @@ export default {
 }
 .registration-header__actions .btn {
   white-space: nowrap;
+}
+.face-preview-panel {
+  position: sticky;
+  top: 88px;
+  overflow: hidden;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+}
+.face-preview-panel__heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #eef2f7;
+}
+.face-preview-panel__icon {
+  display: grid;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 10px;
+  color: #8c1515;
+  background: #fff0f0;
+  font-size: 18px;
+}
+.face-preview-panel__heading h2 {
+  margin: 0;
+  color: #172033;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+.face-preview-panel__heading p {
+  margin: 4px 0 0;
+  color: #7b8798;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.face-preview-panel__photo {
+  position: relative;
+  overflow: hidden;
+  margin-top: 18px;
+  border-radius: 12px;
+  background: #e9edf2;
+  aspect-ratio: 3 / 4;
+}
+.face-preview-panel__photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.face-preview-panel__status {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  backdrop-filter: blur(8px);
+}
+.face-preview-panel__status--success {
+  background: rgba(22, 163, 74, 0.9);
+}
+.face-preview-panel__empty {
+  display: flex;
+  min-height: 250px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-top: 18px;
+  padding: 24px 18px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  color: #64748b;
+  background: linear-gradient(180deg, #f8fafc, #f1f5f9);
+  text-align: center;
+}
+.face-preview-panel__empty > span {
+  display: grid;
+  width: 70px;
+  height: 70px;
+  margin-bottom: 14px;
+  place-items: center;
+  border-radius: 50%;
+  color: #94a3b8;
+  background: #e2e8f0;
+  font-size: 30px;
+}
+.face-preview-panel__empty strong {
+  color: #475569;
+  font-size: 14px;
+}
+.face-preview-panel__empty small {
+  max-width: 190px;
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.face-preview-panel__identity {
+  display: grid;
+  gap: 3px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #eef2f7;
+  text-align: center;
+}
+.face-preview-panel__identity span {
+  overflow: hidden;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.face-preview-panel__identity small {
+  color: #8c1515;
+  font-size: 11px;
+  font-weight: 700;
 }
 .registration-card {
   border: 1px solid #e5e7eb;
@@ -2083,8 +2365,82 @@ export default {
 .address-subsection::before {
   display: none;
 }
-.address-subsection span {
+.address-subsection > span {
   flex: 1 1 auto;
+}
+::v-deep .address-subsection .same-address-checkbox {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  max-width: 100%;
+  margin: 0 0 0 auto;
+  padding: 9px 14px;
+  border: 1px solid #e4d6d6;
+  border-radius: 999px;
+  color: #475569;
+  background: linear-gradient(180deg, #fff, #faf7f7);
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  user-select: none;
+  transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+::v-deep .address-subsection .same-address-checkbox:hover {
+  border-color: #c98282;
+  color: #8c1515;
+  background: #fff7f7;
+  box-shadow: 0 5px 14px rgba(140, 21, 21, 0.1);
+  transform: translateY(-1px);
+}
+::v-deep .address-subsection .same-address-checkbox--checked {
+  border-color: #8c1515;
+  color: #7d1017;
+  background: #fff1f1;
+  box-shadow: 0 4px 14px rgba(140, 21, 21, 0.12);
+}
+::v-deep .address-subsection .same-address-checkbox input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+::v-deep .address-subsection .same-address-checkbox span {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 9px;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+}
+::v-deep .address-subsection .same-address-checkbox span::before {
+  content: '';
+  display: grid;
+  flex: 0 0 19px;
+  width: 19px;
+  height: 19px;
+  place-items: center;
+  border: 1.5px solid #aeb6c2;
+  border-radius: 6px;
+  color: #fff;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  transition: all 0.18s ease;
+}
+::v-deep .address-subsection .same-address-checkbox--checked span::before {
+  content: '\2713';
+  border-color: #8c1515;
+  background: #8c1515;
+  box-shadow: 0 0 0 3px rgba(140, 21, 21, 0.1);
+}
+::v-deep .address-subsection .same-address-checkbox input:focus-visible + span::before {
+  outline: 2px solid rgba(140, 21, 21, 0.35);
+  outline-offset: 2px;
 }
 .address-choice-buttons {
   display: flex;
@@ -2524,6 +2880,42 @@ export default {
   }
   .shipping-rate-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .address-group-card ::v-deep .address-subsection {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding-right: 0;
+  }
+  .address-group-card ::v-deep .address-subsection > span {
+    display: block;
+    min-width: 0;
+    width: 100%;
+    margin-bottom: 0;
+    white-space: normal;
+  }
+  .address-group-card ::v-deep .address-subsection .same-address-checkbox {
+    display: flex;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    justify-content: flex-start;
+    grid-column: 1;
+    margin-left: 0;
+    border-radius: 12px;
+  }
+  .address-group-card ::v-deep .address-subsection .same-address-checkbox span {
+    width: auto;
+    margin-bottom: 0;
+    white-space: normal;
+  }
+}
+@media (max-width: 991px) {
+  .face-preview-panel {
+    position: static;
+  }
+  .face-preview-panel__empty {
+    min-height: 210px;
   }
 }
 @media (max-width: 575px) {

@@ -5,17 +5,16 @@ export default function buildNav (t) {
       _children: [
         {
           _name: 'CSidebarNavItem',
-          name: t('graduation.nav.selfRegistration'),
-          to: '/graduation/register',
-          icon: 'cil-badge',
-
+          name: t('graduation.nav.questionnaire'),
+          to: '/graduation/questionnaire/form',
+          icon: 'cil-list',
+          unrestricted: true
         },
         {
           _name: 'CSidebarNavItem',
-          name: t('graduation.nav.questionnaire'),
-          to: '/graduation/questionnaire',
-          icon: 'cil-list',
-          unrestricted: true
+          name: t('graduation.nav.selfRegistration'),
+          to: '/graduation/register',
+          icon: 'cil-badge'
         },
         {
           _name: 'CSidebarNavItem',
