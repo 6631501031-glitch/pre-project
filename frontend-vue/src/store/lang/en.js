@@ -17,7 +17,7 @@ const en = {
         lastUpdated: "Last updated",
         description: "Description",
         app: {
-            dashboardSystem: "Dashboard System"
+            dashboardSystem: "Student Intention System"
         },
         dialog: {
             error: "ERROR"

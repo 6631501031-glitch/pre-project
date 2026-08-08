@@ -136,6 +136,8 @@ function serializeRegistration(row) {
   item.ceremonyStatusLabel = item.ceremonyStatusLabel || ceremonyStatusLabel(item.ceremonyStatus);
   item.homeAddress = cleanAddress(item.homeAddress);
   item.currentAddress = cleanAddress(item.currentAddress);
+  item.currentAddressSameAsHome = item.currentAddressSameAsHome === true;
+  item.currentAddressBeforeHomeCopy = cleanAddress(item.currentAddressBeforeHomeCopy);
   item.workAddress = cleanAddress(item.workAddress);
   item.certificateDeliveryAddress = cleanAddress(item.certificateDeliveryAddress);
   return item;
@@ -380,6 +382,8 @@ function payloadFromBody(body) {
     programEnglish: cleanText(body.programEnglish),
     homeAddress: cleanAddress(body.homeAddress),
     currentAddress: cleanAddress(body.currentAddress),
+    currentAddressSameAsHome: body.currentAddressSameAsHome === true,
+    currentAddressBeforeHomeCopy: cleanAddress(body.currentAddressBeforeHomeCopy),
     workAddress: cleanAddress(body.workAddress),
     ceremonyStatus: ceremonyStatus,
     ceremonyStatusLabel: ceremonyStatusLabel(ceremonyStatus),
@@ -561,7 +565,10 @@ exports.defaultsForAccount = async function defaultsForAccount(request) {
       .lean();
     if (ownedRows.length) {
       const merged = Object.assign({}, ownedRows[0]);
-      const reusableFields = ['school', 'schoolEnglish', 'program', 'programEnglish'];
+      const reusableFields = [
+        'school', 'schoolEnglish', 'program', 'programEnglish',
+        'questionnaireEmploymentStatus', 'questionnaireNote'
+      ];
       ownedRows.slice(1).forEach(function (row) {
         reusableFields.forEach(function (field) {
           if (!cleanText(merged[field]) && cleanText(row[field])) merged[field] = row[field];

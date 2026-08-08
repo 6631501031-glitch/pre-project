@@ -1,4 +1,5 @@
 export const LANDING_PATH_CANDIDATES = [
+  '/graduation/questionnaire/form',
   '/graduation/register',
   '/dashboard',
   '/graduation-system-using-face-recognition/registry',

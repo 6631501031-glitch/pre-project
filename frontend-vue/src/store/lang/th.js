@@ -19,7 +19,7 @@ const th = {
         lastUpdated: "อัปเดตล่าสุด",
         description: "รายละเอียด",
         app: {
-            dashboardSystem: "ระบบแดชบอร์ด"
+            dashboardSystem: "ระบบแจ้งความประสงค์นักศึกษา"
         },
         dialog: {
             error: "ข้อผิดพลาด"

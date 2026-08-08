@@ -39,28 +39,9 @@
           <div class="account-profile-card__portrait">
             <div class="account-profile-card__avatar">
               <img :src="avatarSrc" :alt="copy.avatarAlt" @error="onProfileImageError">
-              <CButton
-                color="light"
-                class="account-profile-card__image-edit"
-                :class="{ 'is-saving': profileImageSaving }"
-                :aria-label="copy.changeProfilePhoto"
-                :title="copy.changeProfilePhoto"
-                :disabled="profileImageSaving"
-                @click="openProfileImagePicker"
-              >
-                <CIcon name="cil-camera" />
-              </CButton>
             </div>
-            <input
-              ref="profileImageInput"
-              type="file"
-              accept="image/*"
-              class="account-profile-card__image-input"
-              @change="onProfileImageSelected"
-            >
           </div>
 
-          <p v-if="profileImageError" class="account-profile-card__image-error">{{ profileImageError }}</p>
           <h5 class="account-profile-card__name">{{ displayName }}</h5>
 
           <div class="account-profile-card__details">
@@ -83,9 +64,7 @@
 
 <script>
 import {mapGetters} from "vuex";
-import Service from "@/service/api";
-
-const MAX_PROFILE_IMAGE_BYTES = 3 * 1024 * 1024
+import api from "@/service/api";
 
 function pickLangValue(items, lang) {
   if (!Array.isArray(items)) return ''
@@ -171,76 +150,31 @@ export default {
     return {
       defaultAvatar: require('@/assets/avatars/1.jpg'),
       showProfileDialog: false,
-      profileImageDraft: '',
-      profileImageSaving: false,
-      profileImageError: '',
+      scannedFacePhoto: '',
       avatarFailed: false
     }
+  },
+
+  mounted() {
+    this.loadScannedFacePhoto()
   },
 
   methods: {
     onCheckProfile() {
       this.showProfileDialog = true
+      this.loadScannedFacePhoto()
     },
     onProfileDialogShowChange(value) {
       this.showProfileDialog = !!value
     },
-    openProfileImagePicker() {
-      if (this.profileImageSaving) return
-      this.profileImageError = ''
-      if (!this.$refs.profileImageInput) return
-      this.$refs.profileImageInput.value = ''
-      this.$refs.profileImageInput.click()
-    },
-    onProfileImageSelected(event) {
-      const file = event && event.target && event.target.files ? event.target.files[0] : null
-      if (!file) return
-      if (!file.type || !file.type.startsWith('image/')) {
-        this.profileImageError = this.copy.imageTypeError
-        return
-      }
-      if (file.size > MAX_PROFILE_IMAGE_BYTES) {
-        this.profileImageError = this.copy.imageSizeError
-        return
-      }
-
-      const reader = new FileReader()
-      reader.onload = async (loadEvent) => {
-        const image = loadEvent && loadEvent.target ? String(loadEvent.target.result || '') : ''
-        if (!image) {
-          this.profileImageError = this.copy.imageReadError
-          return
-        }
-        await this.saveProfileImage(image)
-      }
-      reader.onerror = () => {
-        this.profileImageError = this.copy.imageReadError
-      }
-      reader.readAsDataURL(file)
-      if (event && event.target) event.target.value = ''
-    },
-    async saveProfileImage(image) {
-      this.profileImageDraft = image
-      this.profileImageError = ''
-      this.profileImageSaving = true
-      this.avatarFailed = false
-
+    async loadScannedFacePhoto() {
       try {
-        const response = await Service.authenticated('profile-photo', { image })
-        const updatedProfile = response && response.data ? response.data.data : null
-        if (updatedProfile) {
-          this.$store.commit('auth/profile', updatedProfile)
-        } else {
-          this.$store.commit('auth/profile', Object.assign({}, this.account, {
-            userinfo: Object.assign({}, this.userinfo, { image })
-          }))
-        }
-        this.profileImageDraft = ''
+        const response = await api.graduateRegistrations('defaults')
+        const registration = response && response.data ? response.data.data : null
+        this.scannedFacePhoto = String((registration && registration.facePhoto) || '').trim()
+        this.avatarFailed = false
       } catch (error) {
-        this.profileImageDraft = ''
-        this.profileImageError = this.copy.imageSaveError
-      } finally {
-        this.profileImageSaving = false
+        this.scannedFacePhoto = ''
       }
     },
     onProfileImageError() {
@@ -337,17 +271,9 @@ export default {
       ))
     },
     profileCardRows() {
-      const path = this.organizationPath.length ? this.organizationPath : compactList(String(this.profileCardDescription || '').split('/'))
-      const unit = fieldValue(path[0] || this.primaryUnitLabel)
-      const affiliation = fieldValue(path.slice(1).join(' / '))
       return [
         { label: this.copy.accountCode, value: fieldValue(this.account.code || this.account.zid) },
-        { label: this.copy.role, value: this.roleLabel },
-        { label: this.copy.email, value: fieldValue(this.account.email) },
-        { label: this.copy.unit, value: unit },
-        { label: this.copy.affiliation, value: affiliation },
-        { label: this.copy.position, value: this.currentPositionTitle },
-        { label: this.copy.personnelType, value: this.personnelTypeLabel }
+        { label: this.copy.email, value: fieldValue(this.account.email) }
       ]
     },
     profileImageSrc() {
@@ -368,15 +294,15 @@ export default {
     },
     avatarSrc() {
       if (this.avatarFailed) return this.defaultAvatar
-      return this.profileImageDraft ||
-        this.profileImageSrc ||
+      return this.scannedFacePhoto ||
         this.defaultAvatar
     }
   },
 
   watch: {
-    profileImageSrc() {
+    profile() {
       this.avatarFailed = false
+      if (this.showProfileDialog) this.loadScannedFacePhoto()
     }
   }
 }
@@ -516,50 +442,6 @@ export default {
     width: 100%;
     height: 100%;
     object-fit: cover;
-  }
-
-  .account-profile-card__image-input {
-    display: none;
-  }
-
-  .account-profile-card__image-edit {
-    position: absolute;
-    right: 3px;
-    bottom: 3px;
-    z-index: 2;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 25px;
-    min-width: 25px;
-    height: 25px;
-    padding: 0;
-    border: 1px solid rgba(143, 16, 28, 0.18);
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.96);
-    color: #75111b;
-    box-shadow: 0 4px 10px rgba(56, 18, 24, 0.18);
-  }
-
-  .account-profile-card__image-edit .c-icon {
-    width: 13px;
-    height: 13px;
-    margin-right: 0;
-  }
-
-  .account-profile-card__image-edit.is-saving {
-    opacity: 0.72;
-    cursor: wait;
-  }
-
-  .account-profile-card__image-error {
-    margin: 0.72rem auto 0;
-    max-width: 88%;
-    color: #8f101c;
-    font-size: 0.7rem;
-    font-weight: 700;
-    line-height: 1.35;
-    text-align: center;
   }
 
   .account-profile-card__name {

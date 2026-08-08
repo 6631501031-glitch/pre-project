@@ -16,12 +16,23 @@
           </div>
           <CRow>
             <CCol md="6">
-              <CSelect
-                v-model="employmentStatus"
-                :label="employmentStatusLabel"
-                :options="employmentOptions"
-                :class="{ 'is-invalid': validationAttempted && !employmentStatus }"
-              />
+              <div class="form-group">
+                <label for="questionnaire-employment-status">{{ employmentStatusLabel }}</label>
+                <select
+                  id="questionnaire-employment-status"
+                  v-model="employmentStatus"
+                  class="form-control"
+                  :class="{ 'is-invalid': validationAttempted && !employmentStatus }"
+                >
+                  <option
+                    v-for="option in employmentOptions"
+                    :key="option.value || 'empty'"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </option>
+                </select>
+              </div>
               <div v-if="validationAttempted && !employmentStatus" class="invalid-feedback d-block">
                 {{ requiredLabel }}
               </div>
@@ -49,7 +60,34 @@
 <script>
 import api from '@/service/api'
 import { notifyError, notifySuccess } from '@/projects/utils/notify'
-import { markGraduationStep } from '@/projects/utils/graduation-workflow-progress'
+import { getGraduationProgress, markGraduationStep } from '@/projects/utils/graduation-workflow-progress'
+
+const QUESTIONNAIRE_CACHE_PREFIX = 'graduate-questionnaire-saved'
+
+function questionnaireIdentity (profile) {
+  const source = profile && typeof profile === 'object' ? profile : {}
+  const userinfo = source.userinfo && typeof source.userinfo === 'object' ? source.userinfo : {}
+  return String(
+    source.studentCode || source.barcodeValue || userinfo.studentCode || userinfo.barcodeValue ||
+    source.email || userinfo.email || source._id || source.id || source.username || 'anonymous'
+  ).trim().toLowerCase()
+}
+
+function normalizeEmploymentStatus (value) {
+  const normalized = String(value == null ? '' : value).trim().toLowerCase()
+  const aliases = {
+    employed: 'employed',
+    'ทำงานแล้ว': 'employed',
+    'not-employed': 'not-employed',
+    'not employed': 'not-employed',
+    'not employed yet': 'not-employed',
+    'ยังไม่ได้ทำงาน': 'not-employed',
+    study: 'study',
+    'continuing study': 'study',
+    'ศึกษาต่อ': 'study'
+  }
+  return aliases[normalized] || ''
+}
 
 export default {
   name: 'GraduateQuestionnaire',
@@ -66,6 +104,9 @@ export default {
   computed: {
     currentProfile () {
       return this.$store && this.$store.getters ? this.$store.getters['auth/profile'] : null
+    },
+    questionnaireCacheKey () {
+      return `${QUESTIONNAIRE_CACHE_PREFIX}:${encodeURIComponent(questionnaireIdentity(this.currentProfile))}`
     },
     isEnglish () {
       return String((this.$i18n && this.$i18n.locale) || '').toLowerCase().startsWith('en')
@@ -90,14 +131,41 @@ export default {
     this.loadQuestionnaire()
   },
   methods: {
+    readSavedQuestionnaire () {
+      if (typeof window === 'undefined' || !window.localStorage) return null
+      try {
+        return JSON.parse(window.localStorage.getItem(this.questionnaireCacheKey) || 'null')
+      } catch (error) {
+        return null
+      }
+    },
+    cacheSavedQuestionnaire () {
+      if (typeof window === 'undefined' || !window.localStorage) return
+      window.localStorage.setItem(this.questionnaireCacheKey, JSON.stringify({
+        employmentStatus: String(this.employmentStatus || ''),
+        note: String(this.note || ''),
+        savedAt: new Date().toISOString()
+      }))
+    },
     async loadQuestionnaire () {
       this.loading = true
       try {
-        const response = await api.graduateRegistrations('defaults')
+        const response = await api.graduateRegistrations('defaults', { _: Date.now() })
         const row = response && response.data ? response.data.data : null
+        const savedProgress = getGraduationProgress(this.currentProfile)
+        const savedQuestionnaire = this.readSavedQuestionnaire()
         this.registration = row || null
-        this.employmentStatus = row && row.questionnaireEmploymentStatus ? String(row.questionnaireEmploymentStatus) : ''
-        this.note = row && row.questionnaireNote ? String(row.questionnaireNote) : ''
+        this.employmentStatus = normalizeEmploymentStatus(savedQuestionnaire && savedQuestionnaire.employmentStatus) ||
+          normalizeEmploymentStatus(row && row.questionnaireEmploymentStatus) ||
+          normalizeEmploymentStatus(savedProgress.questionnaireEmploymentStatus)
+        this.note = savedQuestionnaire
+          ? String(savedQuestionnaire.note || '')
+          : row && row.questionnaireNote
+          ? String(row.questionnaireNote)
+          : String(savedProgress.questionnaireNote || '')
+        if (this.employmentStatus) {
+          markGraduationStep(this.currentProfile, 'questionnaireSaved')
+        }
       } catch (error) {
         notifyError(this.$store, this.isEnglish ? 'Unable to load questionnaire.' : 'ไม่สามารถโหลดแบบสอบถามได้')
       } finally {
@@ -106,6 +174,7 @@ export default {
     },
     async saveQuestionnaire () {
       this.validationAttempted = true
+      this.employmentStatus = normalizeEmploymentStatus(this.employmentStatus)
       if (!this.employmentStatus) return
       this.saving = true
       try {
@@ -117,10 +186,18 @@ export default {
         const response = id
           ? await api.graduateRegistrations('update', Object.assign({ _id: id }, payload))
           : await api.graduateRegistrations('create', payload)
-        this.registration = response && response.data ? response.data.data : payload
+        const savedRow = response && response.data ? response.data.data : null
+        if (!savedRow) throw new Error('Questionnaire was not saved')
+        this.registration = savedRow
         this.validationAttempted = false
-        markGraduationStep(this.currentProfile, 'questionnaireSaved')
+        this.cacheSavedQuestionnaire()
+        markGraduationStep(this.currentProfile, 'questionnaireSaved', {
+          questionnaireEmploymentStatus: this.employmentStatus,
+          questionnaireNote: this.note
+        })
         notifySuccess(this.$store, this.isEnglish ? 'Questionnaire saved.' : 'บันทึกแบบสอบถามเรียบร้อยแล้ว')
+        const navigation = this.$router.push('/graduation/register')
+        if (navigation && typeof navigation.catch === 'function') navigation.catch(() => {})
       } catch (error) {
         notifyError(this.$store, this.isEnglish ? 'Unable to save questionnaire.' : 'ไม่สามารถบันทึกแบบสอบถามได้')
       } finally {

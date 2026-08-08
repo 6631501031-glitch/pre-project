@@ -2,6 +2,7 @@ import Vue from 'vue'
 import Router from 'vue-router'
 import store from '@/store/store'
 import { resolveFirstAccessiblePath } from '@/projects/utils/permission-landing'
+import { getGraduationProgress, isFaceRegistrationEnabled } from '@/projects/utils/graduation-workflow-progress'
 
 const TheContainer = () => import('@/containers/TheContainer')
 const Dashboard = () => import('@/views/Dashboard')
@@ -11,7 +12,7 @@ const Page500 = () => import('@/views/pages/Page500')
 const Login = () => import('@/views/pages/Login')
 const GRADUATIONSYSTEMUSINGFACERECOGNITIONGRADUATIONSYSTEMUSINGFACERECOGNITIONRegistry = () => import('@/projects/views/graduationsystemusingfacerecognition/GRADUATIONSYSTEMUSINGFACERECOGNITIONGRADUATIONSYSTEMUSINGFACERECOGNITIONRegistry')
 const GraduateSelfRegistration = () => import('@/projects/views/graduation/GraduateSelfRegistration')
-const GraduateQuestionnaire = () => import('@/projects/views/graduation/GraduateQuestionnaire')
+const GraduateQuestionnairePage = () => import('@/projects/views/graduation/GraduateQuestionnairePage')
 const GraduateCeremonyPreferences = () => import('@/projects/views/graduation/GraduateCeremonyPreferences')
 const GraduateRegistrationAdmin = () => import('@/projects/views/graduation/GraduateRegistrationAdmin')
 const GraduateCheckInDashboard = () => import('@/projects/views/graduation/GraduateCheckInDashboard')
@@ -34,7 +35,7 @@ const SettingMessageStatus = () => import('@/projects/views/setting/Status')
 
 Vue.use(Router)
 
-const DEFAULT_LANDING_PATH = '/graduation/register'
+const DEFAULT_LANDING_PATH = '/graduation/questionnaire/form'
 
 const router = new Router({
   hash: false,
@@ -65,11 +66,6 @@ const router = new Router({
           name: 'Graduate Self Registration',
 
           component: GraduateSelfRegistration
-        },
-        {
-          path: 'graduation/questionnaire',
-          name: 'Graduate Questionnaire',
-          component: GraduateQuestionnaire
         },
         {
           path: 'graduation/ceremony-preferences',
@@ -189,6 +185,16 @@ const router = new Router({
           component: SettingMessageStatus
         }
       ]
+    },
+    {
+      path: '/graduation/questionnaire',
+      name: 'Graduate Questionnaire',
+      redirect: '/graduation/questionnaire/form'
+    },
+    {
+      path: '/graduation/questionnaire/form',
+      name: 'Graduate Questionnaire Form',
+      component: GraduateQuestionnairePage
     },
     {
       path: '/pages',
@@ -326,7 +332,36 @@ router.beforeEach(async (to, from, next) => {
   }
 
   if (to.meta && to.meta.adminOnly && isStudentLogin) {
-    return next({ path: '/graduation/register' })
+    return next({ path: '/graduation/questionnaire/form' })
+  }
+
+  const questionnaireRequiredPaths = [
+    '/graduation/register',
+    '/graduation/ceremony-preferences',
+    '/graduation/face-checkin'
+  ]
+  if (isStudentLogin && questionnaireRequiredPaths.includes(to.path)) {
+    const progress = getGraduationProgress(profile)
+    if (!progress.questionnaireSaved) {
+      return next({ path: '/graduation/questionnaire/form', query: { required: 'questionnaire' } })
+    }
+  }
+
+  if (isStudentLogin && [
+    '/graduation/ceremony-preferences',
+    '/graduation/face-checkin'
+  ].includes(to.path)) {
+    const progress = getGraduationProgress(profile)
+    if (!progress.registrationSaved) {
+      return next({ path: '/graduation/register', query: { required: 'registration' } })
+    }
+  }
+
+  if (isStudentLogin && to.path === '/graduation/face-checkin') {
+    const progress = getGraduationProgress(profile)
+    if (!isFaceRegistrationEnabled(progress)) {
+      return next({ path: '/graduation/ceremony-preferences', query: { required: 'ceremony' } })
+    }
   }
 
   const permissionMeta = to.meta && to.meta.permission

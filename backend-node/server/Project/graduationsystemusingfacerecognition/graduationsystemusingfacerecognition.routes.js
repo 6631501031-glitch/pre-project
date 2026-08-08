@@ -30,7 +30,9 @@ function fail(response, error) {
 }
 
 function isLocalStudent(request) {
-  return !!(request && request.authSession && request.authSession.source === 'local-student');
+  return !!(
+    request && request.authSession && request.authSession.source === 'local-student'
+  ) || !!localStudentCode(request);
 }
 
 function localStudentCode(request) {

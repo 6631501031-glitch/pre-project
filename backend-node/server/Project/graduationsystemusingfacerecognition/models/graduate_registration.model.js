@@ -37,6 +37,8 @@ const graduateRegistrationSchema = new Schema({
   programEnglish: { type: String, trim: true, default: null, index: true },
   homeAddress: { type: addressSchema, default: () => ({}) },
   currentAddress: { type: addressSchema, default: () => ({}) },
+  currentAddressSameAsHome: { type: Boolean, default: false },
+  currentAddressBeforeHomeCopy: { type: addressSchema, default: () => ({}) },
   workAddress: { type: addressSchema, default: () => ({}) },
   ceremonyStatus: { type: String, trim: true, default: null, index: true },
   ceremonyStatusLabel: { type: String, trim: true, default: null, index: true },

@@ -45,3 +45,17 @@ export function isFaceRegistrationEnabled (progress) {
   return !!(progress && progress.registrationSaved && progress.questionnaireSaved && progress.ceremonySaved &&
     ['10', '20', '30', '40'].includes(ceremonyStatus))
 }
+
+export function updateGraduationProgress (profile, details = {}) {
+  if (typeof window === 'undefined' || !window.localStorage) return
+  const progress = Object.assign({}, getGraduationProgress(profile), details, {
+    updatedAt: new Date().toISOString()
+  })
+  window.localStorage.setItem(storageKey(profile), JSON.stringify(progress))
+  window.dispatchEvent(new CustomEvent(WORKFLOW_PROGRESS_EVENT, { detail: progress }))
+}
+
+export function graduationStepTotal (progress) {
+  const ceremonyStatus = textValue(progress && progress.ceremonyStatus)
+  return ['10', '20', '30', '40'].includes(ceremonyStatus) ? 4 : 3
+}

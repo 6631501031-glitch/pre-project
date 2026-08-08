@@ -1,6 +1,7 @@
 <template>
   <CSidebar
       class="bg-style1"
+      size="lg"
       :minimize="minimize"
       unfoldable
       :show="show"
@@ -76,12 +77,39 @@ export default {
       const navConfig = buildNav(this.$t.bind(this))
       const filtered = this.filterNavTree(navConfig)
       const faceEnabled = isFaceRegistrationEnabled(this.graduationProgress)
+      const questionnaireSaved = !!this.graduationProgress.questionnaireSaved
+      const registrationSaved = !!this.graduationProgress.registrationSaved
+      const completedSteps = {
+        '/graduation/questionnaire/form': questionnaireSaved,
+        '/graduation/register': registrationSaved,
+        '/graduation/ceremony-preferences': !!this.graduationProgress.ceremonySaved,
+        '/graduation/face-checkin': !!this.graduationProgress.faceSaved
+      }
       filtered.forEach(group => {
         const children = Array.isArray(group && group._children) ? group._children : []
         children.forEach(item => {
+          if (this.isStudentLogin && item && [
+            '/graduation/register',
+            '/graduation/ceremony-preferences',
+            '/graduation/face-checkin'
+          ].includes(item.to) && !questionnaireSaved) {
+            item.disabled = true
+            item.addLinkClasses = 'graduation-step-link--disabled'
+          }
+          if (this.isStudentLogin && item && [
+            '/graduation/ceremony-preferences',
+            '/graduation/face-checkin'
+          ].includes(item.to) && !registrationSaved) {
+            item.disabled = true
+            item.addLinkClasses = 'graduation-step-link--disabled'
+          }
           if (item && item.to === '/graduation/face-checkin') {
             item.disabled = !faceEnabled
-            item.addLinkClasses = !faceEnabled ? 'graduation-face-link--disabled' : ''
+            item.addLinkClasses = !faceEnabled ? 'graduation-step-link--disabled' : ''
+          }
+          if (this.isStudentLogin && item && completedSteps[item.to]) {
+            item.badge = { color: 'success', shape: 'pill', text: '✓' }
+            item.addLinkClasses = 'graduation-step-link--completed'
           }
         })
       })
@@ -217,8 +245,43 @@ export default {
 .bg-style1{
   background: linear-gradient(30deg,#FEC260 0%,#8c1515 60%);
 }
-.graduation-face-link--disabled {
+.graduation-step-link--disabled {
   cursor: not-allowed !important;
   opacity: 0.45;
+}
+.graduation-step-link--completed {
+  position: relative;
+  padding-right: 58px !important;
+}
+.graduation-step-link--completed:hover,
+.graduation-step-link--completed.c-active {
+  background: rgba(255, 255, 255, 0.09) !important;
+}
+.graduation-step-link--completed .badge-success {
+  display: inline-grid;
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  position: absolute;
+  top: 50%;
+  right: 18px;
+  margin: 0;
+  padding: 0;
+  place-items: center;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  border-radius: 50%;
+  color: #fff;
+  background: #22c55e;
+  box-shadow: 0 2px 8px rgba(20, 83, 45, 0.38);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  transform: translateY(-50%);
+}
+.c-sidebar-minimized .graduation-step-link--completed {
+  padding-right: 0 !important;
+}
+.c-sidebar-minimized .graduation-step-link--completed .badge-success {
+  display: none;
 }
 </style>
