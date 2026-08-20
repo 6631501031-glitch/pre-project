@@ -2,9 +2,12 @@ const accountRoutes = require("../Project/accounts/accounts.routes");
 const graduationsystemusingfacerecognitionRoutes = require("../Project/graduationsystemusingfacerecognition/graduationsystemusingfacerecognition.routes");
 const securityRoutes = require("../Project/security/security.routes");
 const settingsRoutes = require("../Project/settings/settings.routes");
+const aiRoutes = require("../../routes/ai");
 
 module.exports = function (app) {
   const path = "/api/v1";
+
+  app.use('/api/ai', aiRoutes);
 
   app.use(path + '/graduationsystemusingfacerecognition', graduationsystemusingfacerecognitionRoutes);
   app.use(path + '/setting', settingsRoutes);
