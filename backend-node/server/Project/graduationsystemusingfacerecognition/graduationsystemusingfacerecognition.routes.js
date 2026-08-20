@@ -114,6 +114,14 @@ router.put('/registrations/:id', allowLocalStudent(canViewRegistry, { bindBody: 
   }
 });
 
+router.put('/registrations/:id/face-photo', allowLocalStudent(canViewRegistry, { requireOwnedRegistration: true }), async function (request, response) {
+  try {
+    return ok(response, await graduateRegistration.saveFacePhoto(request.params.id, request.body || {}, request));
+  } catch (error) {
+    return fail(response, error);
+  }
+});
+
 router.put('/registrations/:id/admin-status', canViewRegistry, async function (request, response) {
   try {
     return ok(response, await graduateRegistration.updateAdminStatus(request.params.id, request.body || {}, request));

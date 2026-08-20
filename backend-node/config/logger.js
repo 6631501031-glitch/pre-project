@@ -20,6 +20,16 @@ const logger = winston.createLogger({
     ]
 });
 
+// แปลง response body ให้ปลอดภัยต่อการบันทึก (กัน undefined และ circular reference)
+function safeSerialize(body) {
+    try {
+        const serialized = JSON.stringify(body);
+        return serialized === undefined ? null : JSON.parse(serialized);
+    } catch (error) {
+        return { unserializable: true, reason: error && error.message ? error.message : 'serialize failed' };
+    }
+}
+
 // ฟังก์ชันสำหรับบันทึกข้อมูลที่เกี่ยวข้องกับ success
 function logSuccessData(req, res, body) {
     const logData = {
@@ -31,7 +41,7 @@ function logSuccessData(req, res, body) {
         query: req.query,
         ip: req.ip,
         status: 'success',
-        response: JSON.parse(JSON.stringify(body, null, 2)),
+        response: safeSerialize(body),
         statusCode: res.statusCode,
         timestamp: new Date() // เก็บ timestamp
     };
@@ -50,7 +60,7 @@ function logErrorData(req, res, body) {
         query: req.query,
         ip: req.ip,
         status: 'error',
-        response: JSON.parse(JSON.stringify(body, null, 2)),
+        response: safeSerialize(body),
         statusCode: res.statusCode,
         timestamp: new Date() // เก็บ timestamp
     };
@@ -77,30 +87,26 @@ async function deleteOldLogs() {
 // สร้าง middleware เพื่อดักจับข้อมูล response
 function loggerMiddleware (req, res, next){
     const originalJson = res.json;
-    const originalStatusJson = res.status().json;
 
-    // ดักจับการส่ง json ปกติ (res.json())
+    // ดักจับการส่ง json ทุกกรณี
+    // res.status(200).json() คืนค่า res ตัวเดิม แล้วเรียก res.json ที่ห่อไว้นี้อยู่แล้ว
+    // จึงไม่ต้องห่อ res.status().json แยก (และห้ามเรียก res.status() โดยไม่ส่ง argument
+    // เพราะจะทำให้ res.statusCode เป็น undefined ทุก request -> Node โยน ERR_HTTP_INVALID_STATUS_CODE)
     res.json = function (body) {
         res.locals.responseData = body;  // เก็บข้อมูล response ที่ส่งไปให้ client
-        // บันทึก log ก่อนที่จะส่งข้อมูลไปยัง client
-        if (res.statusCode >= 200 && res.statusCode < 400) {
-            logSuccessData(req, res, body);
-        } else {
-            logErrorData(req, res, body);
-        }
-        return originalJson.call(this, body);  // เรียกใช้งาน res.json เดิม
-    };
 
-    // ดักจับการส่ง json เมื่อมีการกำหนด status (res.status().json())
-    res.status().json = function (body) {
-        res.locals.responseData = body;  // เก็บข้อมูล response ที่ส่งไปให้ client
-        // บันทึก log ก่อนที่จะส่งข้อมูลไปยัง client
-        if (res.statusCode >= 200 && res.statusCode < 400) {
-            logSuccessData(req, res, body);
-        } else {
-            logErrorData(req, res, body);
+        // การบันทึก log ต้องไม่ทำให้ response ล้มเหลว
+        try {
+            if (res.statusCode >= 200 && res.statusCode < 400) {
+                logSuccessData(req, res, body);
+            } else {
+                logErrorData(req, res, body);
+            }
+        } catch (logError) {
+            console.error('Request logging failed:', logError && logError.message ? logError.message : logError);
         }
-        return originalStatusJson.call(this, body);  // เรียกใช้งาน res.status().json เดิม
+
+        return originalJson.call(this, body);  // เรียกใช้งาน res.json เดิม
     };
     // ลบ log เก่าทุกๆ 10 วินาทีใน background
     // setTimeout(deleteOldLogs, 10000);

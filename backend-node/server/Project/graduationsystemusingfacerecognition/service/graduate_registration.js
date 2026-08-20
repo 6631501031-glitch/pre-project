@@ -6,6 +6,11 @@ const GRADUATE_INITIAL_CATALOG = require('./graduate_initial_catalog');
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 4000;
+// Face photos are stored inline on the registration document, so keep them well
+// below the 16MB BSON limit. The browser downscales to 720px / JPEG q0.86 which
+// lands around 100KB.
+const MAX_FACE_PHOTO_BYTES = 4 * 1024 * 1024;
+const DEFAULT_FACE_PHOTO_SOURCE = 'mediapipe-blaze_face_short_range';
 const CEREMONY_STATUS_LABELS_TH = {
   1: 'เข้ารับพระราชทานปริญญาบัตร',
   2: 'ไม่เข้ารับพระราชทานปริญญาบัตร แต่เข้าร่วมการถ่ายรูปหมู่สำนักวิชา',
@@ -55,6 +60,33 @@ function cleanFacePhoto(value) {
   const normalized = cleanText(value);
   if (!normalized) return null;
   return /^data:image\/(jpeg|jpg|png|webp);base64,/i.test(normalized) ? normalized : null;
+}
+
+function facePhotoByteLength(dataUrl) {
+  const base64 = String(dataUrl || '').split(',')[1] || '';
+  return Math.floor((base64.length * 3) / 4);
+}
+
+function cleanMetric(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function cleanFaceDetection(value) {
+  const source = value && typeof value === 'object' ? value : {};
+  return {
+    model: cleanText(source.model),
+    score: cleanMetric(source.score),
+    faceCount: cleanMetric(source.faceCount),
+    coverage: cleanMetric(source.coverage),
+    offsetX: cleanMetric(source.offsetX),
+    offsetY: cleanMetric(source.offsetY),
+    roll: cleanMetric(source.roll),
+    yaw: cleanMetric(source.yaw),
+    brightness: cleanMetric(source.brightness),
+    width: cleanMetric(source.width),
+    height: cleanMetric(source.height)
+  };
 }
 
 function cleanCode(value) {
@@ -368,7 +400,7 @@ function payloadFromBody(body) {
   const requiresCertificateDelivery = requiresCertificateDeliveryStatus(ceremonyStatus);
   const certificateDeliveryMethod = requiresCertificateDelivery ? cleanText(body.certificateDeliveryMethod) : null;
   const certificateShippingService = certificateDeliveryMethod === 'postal' ? cleanText(body.certificateShippingService) : null;
-  return {
+  const payload = {
     firstName: cleanText(body.firstName),
     lastName: cleanText(body.lastName),
     namePronunciation: namePronunciation,
@@ -397,10 +429,21 @@ function payloadFromBody(body) {
     questionnaireEmploymentStatus: cleanText(body.questionnaireEmploymentStatus),
     questionnaireNote: cleanText(body.questionnaireNote),
     studentCode: cleanText(body.studentCode || body.barcodeValue),
-    barcodeValue: cleanText(body.barcodeValue || body.studentCode),
-    facePhoto: cleanFacePhoto(body.facePhoto),
-    facePhotoCapturedAt: cleanFacePhoto(body.facePhoto) ? new Date() : null
+    barcodeValue: cleanText(body.barcodeValue || body.studentCode)
   };
+
+  // The face photo has its own endpoint, so a profile save that does not carry a
+  // photo must keep the already registered one instead of clearing it.
+  if (Object.prototype.hasOwnProperty.call(body, 'facePhoto')) {
+    const facePhoto = cleanFacePhoto(body.facePhoto);
+    payload.facePhoto = facePhoto;
+    payload.facePhotoCapturedAt = facePhoto ? new Date() : null;
+    payload.facePhotoBytes = facePhoto ? facePhotoByteLength(facePhoto) : null;
+    payload.facePhotoSource = facePhoto ? cleanText(body.facePhotoSource) || DEFAULT_FACE_PHOTO_SOURCE : null;
+    payload.facePhotoDetection = facePhoto ? cleanFaceDetection(body.facePhotoDetection) : null;
+  }
+
+  return payload;
 }
 
 function validatePayload(payload) {
@@ -637,6 +680,66 @@ exports.update = async function update(id, body, request) {
     throw error;
   }
   return updated;
+};
+
+/**
+ * Stores the scanned face photo (base64 JPEG produced by the MediaPipe scan) on
+ * the graduate registration document. Only the face fields are written, so a
+ * scan can never overwrite registration data the student filled in earlier.
+ */
+exports.saveFacePhoto = async function saveFacePhoto(id, body, request) {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    const error = new Error('Invalid graduate registration id');
+    error.status = 400;
+    throw error;
+  }
+
+  const source = body && typeof body === 'object' ? body : {};
+  const facePhoto = cleanFacePhoto(source.facePhoto);
+  if (!facePhoto) {
+    const error = new Error('facePhoto must be a base64 image data URL');
+    error.status = 400;
+    throw error;
+  }
+
+  const bytes = facePhotoByteLength(facePhoto);
+  if (bytes > MAX_FACE_PHOTO_BYTES) {
+    const error = new Error('Face photo exceeds the maximum allowed size');
+    error.status = 413;
+    throw error;
+  }
+
+  const detection = cleanFaceDetection(source.facePhotoDetection);
+  const updated = await GraduateRegistration.findOneAndUpdate(
+    accountOwnershipFilter(id, request),
+    {
+      $set: {
+        facePhoto: facePhoto,
+        facePhotoCapturedAt: new Date(),
+        facePhotoBytes: bytes,
+        facePhotoSource: cleanText(source.facePhotoSource) || DEFAULT_FACE_PHOTO_SOURCE,
+        facePhotoDetection: detection,
+        update: actorFromRequest(request || {})
+      }
+    },
+    { new: true, runValidators: true, projection: { facePhoto: 0 } }
+  ).lean();
+
+  if (!updated) {
+    const error = new Error('Graduate registration not found for current account');
+    error.status = 404;
+    throw error;
+  }
+
+  // The browser already holds the image, so the response only echoes the stored
+  // metadata to keep the payload small.
+  return {
+    _id: updated._id,
+    facePhotoCapturedAt: updated.facePhotoCapturedAt,
+    facePhotoBytes: updated.facePhotoBytes,
+    facePhotoSource: updated.facePhotoSource,
+    facePhotoDetection: updated.facePhotoDetection || detection
+  };
 };
 
 exports.updateAdminStatus = async function updateAdminStatus(id, body, request) {

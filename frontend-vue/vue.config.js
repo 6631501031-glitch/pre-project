@@ -50,7 +50,9 @@ module.exports = {
   },
   transpileDependencies: [
     '@coreui/utils',
-    'axios'
+    'axios',
+    // The MediaPipe bundle ships modern syntax that webpack 4 cannot parse on its own.
+    '@mediapipe/tasks-vision'
   ],
   // use this option for production linking
   // publicPath: process.env.NODE_ENV === 'production' ? '/vue/demo/3.0.0' : '/'

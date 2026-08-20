@@ -1,3 +1,4 @@
+.history/
 .env
 .env.*
 
@@ -8,4 +9,5 @@ frontend-vue/tests/e2e/reports/
 .cache/
 *.log
 backend-node/backups/
+frontend-vue/public/mediapipe/
 .DS_Store

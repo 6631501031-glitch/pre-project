@@ -22,6 +22,22 @@ const addressSchema = new Schema({
   postalCode: { type: String, trim: true, default: null }
 }, { _id: false });
 
+// Quality metrics reported by the browser side MediaPipe face detector for the
+// frame that was accepted as the registered face photo.
+const faceDetectionSchema = new Schema({
+  model: { type: String, trim: true, default: null },
+  score: { type: Number, default: null },
+  faceCount: { type: Number, default: null },
+  coverage: { type: Number, default: null },
+  offsetX: { type: Number, default: null },
+  offsetY: { type: Number, default: null },
+  roll: { type: Number, default: null },
+  yaw: { type: Number, default: null },
+  brightness: { type: Number, default: null },
+  width: { type: Number, default: null },
+  height: { type: Number, default: null }
+}, { _id: false });
+
 const graduateRegistrationSchema = new Schema({
   accountId: { type: Schema.ObjectId, default: null, index: true },
   firstName: { type: String, trim: true, default: null, index: true },
@@ -55,6 +71,9 @@ const graduateRegistrationSchema = new Schema({
   barcodeValue: { type: String, trim: true, default: null, index: true },
   facePhoto: { type: String, default: null },
   facePhotoCapturedAt: { type: Date, default: null },
+  facePhotoBytes: { type: Number, default: null },
+  facePhotoSource: { type: String, trim: true, default: null },
+  facePhotoDetection: { type: faceDetectionSchema, default: null },
   create: { type: auditSchema, default: () => ({}) },
   update: { type: auditSchema, default: null }
 }, {
