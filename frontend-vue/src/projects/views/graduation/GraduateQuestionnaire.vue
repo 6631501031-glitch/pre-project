@@ -173,6 +173,7 @@ export default {
       }
     },
     async saveQuestionnaire () {
+      if (this.saving) return
       this.validationAttempted = true
       this.employmentStatus = normalizeEmploymentStatus(this.employmentStatus)
       if (!this.employmentStatus) return
@@ -184,7 +185,11 @@ export default {
         })
         const id = this.registration && (this.registration._id || this.registration.id)
         const response = id
-          ? await api.graduateRegistrations('update', Object.assign({ _id: id }, payload))
+          ? await api.graduateRegistrations('save-questionnaire', {
+            _id: id,
+            questionnaireEmploymentStatus: this.employmentStatus,
+            questionnaireNote: this.note
+          })
           : await api.graduateRegistrations('create', payload)
         const savedRow = response && response.data ? response.data.data : null
         if (!savedRow) throw new Error('Questionnaire was not saved')

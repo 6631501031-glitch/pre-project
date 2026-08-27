@@ -15,6 +15,9 @@ const CDN_PACKAGE_ROOT =
 const CDN_VISION_BUNDLE =
   `${CDN_PACKAGE_ROOT}/vision_bundle.mjs`
 
+const LOCAL_VISION_BUNDLE =
+  process.env.VUE_APP_MEDIAPIPE_VISION_BUNDLE || '/mediapipe/vision_bundle.mjs'
+
 const CDN_WASM_PATH =
   `${CDN_PACKAGE_ROOT}/wasm`
 
@@ -103,7 +106,14 @@ function importVisionBundle () {
       'return import(url)'
     )
 
-    visionBundlePromise = nativeImport(CDN_VISION_BUNDLE)
+    visionBundlePromise = nativeImport(LOCAL_VISION_BUNDLE)
+      .catch(localError => {
+        console.warn(
+          '[MediaPipe] Local vision bundle unavailable. Using CDN.',
+          localError
+        )
+        return nativeImport(CDN_VISION_BUNDLE)
+      })
       .catch(error => {
         visionBundlePromise = null
         throw error
