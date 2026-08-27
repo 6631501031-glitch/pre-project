@@ -11,6 +11,8 @@ const path = require('path');
 
 const SOURCE_DIR = path.resolve(__dirname, '..', 'node_modules', '@mediapipe', 'tasks-vision', 'wasm');
 const TARGET_DIR = path.resolve(__dirname, '..', 'public', 'mediapipe', 'wasm');
+const BUNDLE_SOURCE = path.resolve(__dirname, '..', 'node_modules', '@mediapipe', 'tasks-vision', 'vision_bundle.mjs');
+const BUNDLE_TARGET = path.resolve(__dirname, '..', 'public', 'mediapipe', 'vision_bundle.mjs');
 
 function copyIfChanged(fileName) {
   const source = path.join(SOURCE_DIR, fileName);
@@ -37,6 +39,14 @@ function main() {
   files.forEach(name => {
     if (copyIfChanged(name)) copied += 1;
   });
+
+  if (fs.existsSync(BUNDLE_SOURCE)) {
+    const sourceStat = fs.statSync(BUNDLE_SOURCE);
+    const targetStat = fs.existsSync(BUNDLE_TARGET) ? fs.statSync(BUNDLE_TARGET) : null;
+    if (!targetStat || sourceStat.size !== targetStat.size || sourceStat.mtimeMs > targetStat.mtimeMs) {
+      fs.copyFileSync(BUNDLE_SOURCE, BUNDLE_TARGET);
+    }
+  }
 
   console.log(`[mediapipe] ${copied} of ${files.length} Wasm asset(s) copied to public/mediapipe/wasm`);
 }

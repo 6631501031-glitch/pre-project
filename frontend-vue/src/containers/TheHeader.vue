@@ -40,7 +40,6 @@
 <!--          <CIcon v-else name="cil-moon"/>-->
 <!--        </button>-->
 <!--      </CHeaderNavItem>-->
-      <TheHeaderDropdownNotif/>
 <!--      <TheHeaderDropdownTasks/>-->
 <!--      <TheHeaderDropdownMssgs/>-->
 <!--      <TheHeaderDropdownAccnt/>-->
@@ -70,14 +69,12 @@
 
 <script>
 import TheHeaderDropdownAccnt from './TheHeaderDropdownAccnt'
-import TheHeaderDropdownNotif from './TheHeaderDropdownNotif'
 import {mapGetters} from "vuex";
 
 export default {
   name: 'TheHeader',
   components: {
-    TheHeaderDropdownAccnt,
-    TheHeaderDropdownNotif
+    TheHeaderDropdownAccnt
   },
 
   methods: {

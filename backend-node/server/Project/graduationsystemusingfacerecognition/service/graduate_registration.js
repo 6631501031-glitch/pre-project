@@ -683,6 +683,44 @@ exports.update = async function update(id, body, request) {
 };
 
 /**
+ * Saves only questionnaire fields. Questionnaire completion happens before the
+ * ceremony form, so it must not run validation for ceremony delivery fields.
+ */
+exports.saveQuestionnaire = async function saveQuestionnaire(id, body, request) {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    const error = new Error('Invalid graduate registration id');
+    error.status = 400;
+    throw error;
+  }
+
+  const employmentStatus = cleanText(body && body.questionnaireEmploymentStatus);
+  if (!['employed', 'not-employed', 'study'].includes(employmentStatus)) {
+    const error = new Error('questionnaireEmploymentStatus is required');
+    error.status = 400;
+    throw error;
+  }
+
+  const updated = await GraduateRegistration.findOneAndUpdate(
+    accountOwnershipFilter(id, request),
+    {
+      $set: {
+        questionnaireEmploymentStatus: employmentStatus,
+        questionnaireNote: cleanText(body && body.questionnaireNote),
+        update: actorFromRequest(request || {})
+      }
+    },
+    { new: true, runValidators: true }
+  ).lean();
+
+  if (!updated) {
+    const error = new Error('Graduate registration not found for current account');
+    error.status = 404;
+    throw error;
+  }
+  return updated;
+};
+
+/**
  * Stores the scanned face photo (base64 JPEG produced by the MediaPipe scan) on
  * the graduate registration document. Only the face fields are written, so a
  * scan can never overwrite registration data the student filled in earlier.

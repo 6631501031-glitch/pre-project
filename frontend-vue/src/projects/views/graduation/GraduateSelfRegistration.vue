@@ -1634,6 +1634,25 @@ export default {
       }, { source: 'registration' })
       this.form.questionnaireEmploymentStatus = meaningfulOptionValue(registration && registration.questionnaireEmploymentStatus)
       this.form.questionnaireNote = textValue(registration && registration.questionnaireNote)
+
+      // The local draft is restored before the server record is loaded. Keep the
+      // server-owned ceremony section authoritative so saving the questionnaire
+      // cannot overwrite a ceremony choice with stale blank draft values.
+      this.form.ceremonyStatus = normalizeCeremonyStatus(registration && registration.ceremonyStatus)
+      this.form.ceremonyAssistanceType = isAssistanceCeremonyStatus(this.form.ceremonyStatus)
+        ? normalizeCode(registration && registration.ceremonyAssistanceType)
+        : ''
+      this.form.ceremonyStatusNote = textValue(registration && registration.ceremonyStatusNote)
+      this.form.certificateDeliveryMethod = textValue(registration && registration.certificateDeliveryMethod)
+      this.form.certificateShippingService = textValue(registration && registration.certificateShippingService)
+      this.form.certificateDeliveryAddress = Object.assign(
+        emptyAddress(),
+        registration && registration.certificateDeliveryAddress
+      )
+      this.form.hasFoodAllergy = normalizeYesNo(registration && registration.hasFoodAllergy)
+      this.form.foodAllergyNote = this.form.hasFoodAllergy === 'yes'
+        ? textValue(registration && registration.foodAllergyNote)
+        : ''
       this.applyAddressDefaults(registration)
       if (this.currentAddressSameAsHome) {
         this.copyHomeAddressToCurrent()
