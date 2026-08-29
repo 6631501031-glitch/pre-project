@@ -30,7 +30,34 @@ function isLocalStudentSession(request) {
   return !!(request && request.authSession && request.authSession.source === 'local-student');
 }
 
-router.post("/signin", function (request, response) {
+function hasIamSigninCredentials() {
+  const clientId = process.env.IAM_SDK_CLIENT_ID || process.env.IAM_ADMIN_CLIENT_ID || process.env.IAM_SDK_ADMIN_CLIENT_ID;
+  const clientSecret = process.env.IAM_SDK_CLIENT_SECRET || process.env.IAM_ADMIN_CLIENT_SECRET || process.env.IAM_SDK_ADMIN_CLIENT_SECRET;
+  return !!(String(clientId || '').trim() && String(clientSecret || '').trim());
+}
+
+function requireLamduanAccount(request, response, next) {
+  const email = String(request && request.body && request.body.email || '').trim().toLowerCase();
+  if (!email.endsWith('@lamduan.mfu.ac.th')) {
+    return response.status(403).json({
+      status: false,
+      code: 'AUTH_LAMDUAN_ACCOUNT_REQUIRED',
+      message: 'Please sign in with an @lamduan.mfu.ac.th account.'
+    });
+  }
+  request.localVerifiedLamduanSignin = true;
+  return next();
+}
+
+router.post("/signin", function (request, response, next) {
+  const isGoogleSignin = !!(request && request.body && request.body.token);
+  if (isGoogleSignin && !hasIamSigninCredentials()) {
+    return Account.verifyIdTokenGoogle(request, response, function () {
+      return requireLamduanAccount(request, response, function () {
+        return Account.SingIn(request, response, next);
+      });
+    });
+  }
   return iamAdminClient.forwardScopedSignin(request, response);
 });
 router.get("/auth/me", Account.onCheckAuthorization, function (request, response) {
