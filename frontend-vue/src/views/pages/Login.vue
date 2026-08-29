@@ -7,10 +7,12 @@
             <CCardBody>
               <div class="login-brand">
                 <img src="@/assets/logo.svg" height="118px" alt="MFU" />
+                <h3 class="admin-login-title">เข้าสู่ระบบผู้ดูแล</h3>
+                <p class="admin-login-description">เข้าสู่ระบบด้วยบัญชี MFU Google @lamduan.mfu.ac.th</p>
                 <h3>เข้าสู่ระบบนักศึกษา</h3>
                 <p>กรอกรหัสนักศึกษาเพื่อเข้าสู่ระบบ ไม่ต้องใช้รหัสผ่าน</p>
               </div>
-              <CForm class="student-login-form" @submit.prevent="onAuthenStudent">
+              <CForm v-if="false" class="student-login-form" @submit.prevent="onAuthenStudent">
                 <CInput
                   ref="studentCodeField"
                   v-model.trim="studentCode"
@@ -34,7 +36,6 @@
                   เข้าสู่ระบบ
                 </CButton>
               </CForm>
-              <div class="login-divider"><span>หรือ</span></div>
               <CButton color="light" variant="outline" class="google-login-button" :disabled="submitting" @click="onAuthenGoogle">
                 <img src="@/assets/icons/logo-google.png" width="22" height="22" alt="" />
                 เข้าสู่ระบบด้วย MFU Google
@@ -152,6 +153,10 @@ export default {
 .login-brand p {
   margin: 0 0 22px;
   color: #6b7280;
+}
+.login-brand h3:not(.admin-login-title),
+.login-brand p:not(.admin-login-description) {
+  display: none;
 }
 .student-login-form ::v-deep label {
   color: #374151;

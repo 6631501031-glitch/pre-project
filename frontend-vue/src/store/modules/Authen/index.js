@@ -306,7 +306,7 @@ const ServerModule = {
                     commit('is2FA', false);
                     commit('pendingToken', '');
                     commit('pendingStudentCode', '');
-                    await pushPostSignInRoute();
+                    await pushPostSignInRoute(studentCode ? POST_SIGNIN_ROUTE : '/dashboard');
                     return;
                 }
 

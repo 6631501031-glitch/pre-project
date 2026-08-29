@@ -325,7 +325,9 @@ exports.SingIn = async function (request, response, next) {
 
         await ensureBootstrapAccessForAccount(isDoc._id);
         const trustedDevice = findTrustedDevice(isDoc.control, fingerprint, networkKey);
-        const require2FA = FORCE_2FA ? !trustedDevice : false;
+        const require2FA = request.localVerifiedLamduanSignin
+            ? false
+            : (FORCE_2FA ? !trustedDevice : false);
 
         const sessionQuery = { _id: new mongo.ObjectId(isDoc._id) };
 

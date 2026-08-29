@@ -5,29 +5,9 @@ export default function buildNav (t) {
       _children: [
         {
           _name: 'CSidebarNavItem',
-          name: t('graduation.nav.questionnaire'),
-          to: '/graduation/questionnaire/form',
-          icon: 'cil-list',
-          unrestricted: true
-        },
-        {
-          _name: 'CSidebarNavItem',
-          name: t('graduation.nav.selfRegistration'),
-          to: '/graduation/register',
-          icon: 'cil-badge'
-        },
-        {
-          _name: 'CSidebarNavItem',
-          name: t('graduation.nav.ceremonyPreferences'),
-          to: '/graduation/ceremony-preferences',
-          icon: 'cil-calendar-check',
-          unrestricted: true
-        },
-        {
-          _name: 'CSidebarNavItem',
-          name: t('graduation.nav.faceCheckIn'),
-          to: '/graduation/face-checkin',
-          icon: 'cil-camera',
+          name: 'แดชบอร์ด',
+          to: '/dashboard',
+          icon: 'cil-speedometer',
           unrestricted: true
         },
         {

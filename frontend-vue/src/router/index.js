@@ -35,7 +35,7 @@ const SettingMessageStatus = () => import('@/projects/views/setting/Status')
 
 Vue.use(Router)
 
-const DEFAULT_LANDING_PATH = '/graduation/questionnaire/form'
+const DEFAULT_LANDING_PATH = '/dashboard'
 
 const router = new Router({
   hash: false,
@@ -333,6 +333,16 @@ router.beforeEach(async (to, from, next) => {
 
   if (to.meta && to.meta.adminOnly && isStudentLogin) {
     return next({ path: '/graduation/questionnaire/form' })
+  }
+
+  const studentOnlyPaths = [
+    '/graduation/questionnaire/form',
+    '/graduation/register',
+    '/graduation/ceremony-preferences',
+    '/graduation/face-checkin'
+  ]
+  if (!isStudentLogin && studentOnlyPaths.includes(to.path)) {
+    return next({ path: '/dashboard' })
   }
 
   const questionnaireRequiredPaths = [
