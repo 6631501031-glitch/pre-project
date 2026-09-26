@@ -349,6 +349,16 @@ router.beforeEach(async (to, from, next) => {
     return next({ path: '/graduation/questionnaire/form' })
   }
 
+  const studentOnlyPaths = [
+    '/graduation/questionnaire/form',
+    '/graduation/register',
+    '/graduation/ceremony-preferences',
+    '/graduation/face-checkin'
+  ]
+  if (!isStudentLogin && studentOnlyPaths.includes(to.path)) {
+    return next({ path: '/dashboard' })
+  }
+
   const questionnaireRequiredPaths = [
     '/graduation/register',
     '/graduation/ceremony-preferences',

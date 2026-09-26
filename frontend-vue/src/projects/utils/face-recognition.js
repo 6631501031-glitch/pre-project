@@ -1,71 +1,76 @@
-let runtimePromise
-const ASSET_PATH = '/face-recognition'
+import * as faceapi from 'face-api.js'
 
-export function loadRecognition () {
-  if (!runtimePromise) {
-    runtimePromise = new Promise((resolve, reject) => {
-      if (window.faceapi) return resolve(window.faceapi)
-      const script = document.createElement('script')
-      script.src = ASSET_PATH + '/face-api.min.js'
-      script.onload = () => window.faceapi ? resolve(window.faceapi) : reject(new Error('Face runtime unavailable'))
-      script.onerror = () => { script.remove(); reject(new Error('Face runtime unavailable')) }
-      document.head.appendChild(script)
-    }).then(async faceapi => {
-      await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(ASSET_PATH),
-        faceapi.nets.faceLandmark68Net.loadFromUri(ASSET_PATH),
-        faceapi.nets.faceRecognitionNet.loadFromUri(ASSET_PATH)
-      ])
-      return faceapi
-    }).catch(error => { runtimePromise = null; throw error })
+const MODEL_URL = '/models'
+const MATCH_THRESHOLD = 0.55
+let modelPromise = null
+
+export function loadFaceRecognitionModels () {
+  if (!modelPromise) {
+    modelPromise = Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+      faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+      faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+    ]).catch(error => {
+      modelPromise = null
+      throw error
+    })
   }
-  return runtimePromise
+  return modelPromise
 }
 
-export async function describeFaces (input) {
-  const faceapi = await loadRecognition()
-  return faceapi.detectAllFaces(input, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.6 }))
-    .withFaceLandmarks().withFaceDescriptors()
+async function descriptorFromInput (input) {
+  const result = await faceapi
+    .detectSingleFace(input, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 }))
+    .withFaceLandmarks()
+    .withFaceDescriptor()
+  return result ? result.descriptor : null
 }
 
-export async function referenceDescriptor (dataUrl) {
-  const image = new Image()
-  await new Promise((resolve, reject) => {
-    image.onload = resolve
-    image.onerror = () => reject(new Error('Invalid reference image'))
+function imageFromDataUrl (dataUrl) {
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    image.onload = () => resolve(image)
+    image.onerror = () => reject(new Error('REFERENCE_FACE_IMAGE_INVALID'))
     image.src = dataUrl
   })
-  const faces = await describeFaces(image)
-  return faces.length === 1 ? faces[0].descriptor : null
 }
 
-export function matchFace (descriptor, gallery) {
-  if (!descriptor || descriptor.length !== 128 || !Array.from(descriptor).every(Number.isFinite)) return null
-  const ranked = gallery.map(item => {
-    let sum = 0
-    for (let i = 0; i < 128; i++) sum += Math.pow(descriptor[i] - item.descriptor[i], 2)
-    return { row: item.row, distance: Math.sqrt(sum) }
-  }).filter(item => Number.isFinite(item.distance)).sort((a, b) => a.distance - b.distance)
-  const best = ranked[0]
-  // Reject unknown faces and near-ties rather than assigning the closest name blindly.
-  if (!best || best.distance > 0.5 || (ranked[1] && ranked[1].distance - best.distance < 0.08)) return null
-  return best
+export async function buildFaceRosterDescriptors (rows) {
+  await loadFaceRecognitionModels()
+  const descriptors = []
+  for (const row of rows || []) {
+    try {
+      const image = await imageFromDataUrl(row.facePhoto)
+      const descriptor = await descriptorFromInput(image)
+      if (descriptor) descriptors.push({ row, descriptor })
+    } catch (error) {
+      // Skip an unreadable legacy image; other saved faces remain available.
+    }
+  }
+  return descriptors
 }
 
-export function createConfirmationTracker () {
-  const observations = new Map()
+export async function matchFaceDataUrl (dataUrl, roster, threshold = MATCH_THRESHOLD) {
+  await loadFaceRecognitionModels()
+  const image = await imageFromDataUrl(dataUrl)
+  const probe = await descriptorFromInput(image)
+  if (!probe) return { matched: false, reason: 'NO_FACE' }
+
+  let best = null
+  ;(roster || []).forEach(candidate => {
+    const distance = faceapi.euclideanDistance(probe, candidate.descriptor)
+    if (!best || distance < best.distance) best = { row: candidate.row, distance }
+  })
+
+  if (!best || best.distance > threshold) {
+    return { matched: false, reason: 'NO_MATCH', distance: best && best.distance }
+  }
   return {
-    observe (matches, now) {
-      const current = new Set(matches.map(match => String(match.row._id)))
-      for (const id of observations.keys()) if (!current.has(id)) observations.delete(id)
-      return matches.filter(match => {
-        const id = String(match.row._id)
-        const prior = observations.get(id)
-        const count = prior && now - prior.time < 2500 ? prior.count + 1 : 1
-        observations.set(id, { count, time: now })
-        return count >= 2
-      })
-    },
-    clear () { observations.clear() }
+    matched: true,
+    row: best.row,
+    distance: best.distance,
+    confidence: Math.max(0, Math.min(1, 1 - best.distance))
   }
 }
+
+export { MATCH_THRESHOLD }

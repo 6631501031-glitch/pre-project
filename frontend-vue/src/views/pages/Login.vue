@@ -17,7 +17,7 @@
                 <img src="@/assets/logo.svg" height="118px" alt="MFU" />
                 <h3>{{ copy.title }}</h3>
               </div>
-              <CForm class="student-login-form" @submit.prevent="onAuthenStudent">
+              <CForm v-if="false" class="student-login-form" @submit.prevent="onAuthenStudent">
                 <CInput
                   ref="studentCodeField"
                   v-model.trim="studentCode"
@@ -41,7 +41,7 @@
                   {{ copy.signIn }}
                 </CButton>
               </CForm>
-              <div class="login-divider"><span>{{ copy.or }}</span></div>
+              <div class="login-divider"><span>หรือ</span></div>
               <CButton color="light" variant="outline" class="google-login-button" :disabled="submitting" @click="onAuthenGoogle">
                 <img src="@/assets/icons/logo-google.png" width="22" height="22" alt="" />
                 {{ copy.googleSignIn }}
@@ -217,6 +217,10 @@ export default {
 .login-brand p {
   margin: 0 0 22px;
   color: #6b7280;
+}
+.login-brand h3:not(.admin-login-title),
+.login-brand p:not(.admin-login-description) {
+  display: none;
 }
 .student-login-form ::v-deep label {
   color: #374151;
