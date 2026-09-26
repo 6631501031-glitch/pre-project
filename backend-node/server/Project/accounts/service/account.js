@@ -172,8 +172,9 @@ exports.onCheckAuthorization = async function (request, response, next) {
                 }
                 request.body.accounts = String(local.account._id);
                 request.authAccount = local.account;
+                const accountEmail = String(local.account.email || '').trim().toLowerCase();
                 request.authSession = {
-                    source: 'local-student',
+                    source: local.session.authSource || (accountEmail.endsWith('@lamduan.mfu.ac.th') ? 'local-admin' : 'local-student'),
                     token: accessToken,
                     device: local.session
                 };
@@ -321,6 +322,15 @@ exports.SingIn = async function (request, response, next) {
                 status: resolvedAccount.status
             };
             return response.status(401).json(denied);
+        }
+
+        // Refresh existing bootstrap accounts from the verified Google identity too.
+        if (request.localVerifiedLamduanSignin && request.body.googleGivenName) {
+            const firstName = toLangArray(request.body.googleGivenName, 'en');
+            await Account.onUpdate({ _id: new mongo.ObjectId(isDoc._id) }, {
+                $set: { 'userinfo.firstName': firstName }
+            });
+            isDoc.userinfo = Object.assign({}, isDoc.userinfo || {}, { firstName });
         }
 
         await ensureBootstrapAccessForAccount(isDoc._id);

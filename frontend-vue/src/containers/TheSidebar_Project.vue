@@ -15,7 +15,7 @@
       <!--          viewBox="0 0 556 134"-->
       <!--      />-->
       <div class="c-sidebar-brand-full">
-        <a href="/">
+        <div class="sidebar-brand-label">
           <CRow >
             <img class="pt-2 pb-2" src="@/assets/logo.svg" height="60px">
             <CCol class="text-white">
@@ -23,7 +23,7 @@
               <p class="font-weight-bold">{{ $t('common.app.dashboardSystem') }}</p>
             </CCol>
           </CRow>
-        </a>
+        </div>
       </div>
 
 

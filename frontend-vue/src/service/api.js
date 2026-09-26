@@ -328,6 +328,10 @@ export default {
 
   graduateRegistrations(method, data) {
     switch (method) {
+      case 'face-gallery':
+        return instance.get('/api/v1/graduationsystemusingfacerecognition/registrations/face-gallery', { params: data || {} });
+      case 'check-in':
+        return instance.post(`/api/v1/graduationsystemusingfacerecognition/registrations/${data && data._id}/check-in`, data || {});
       case 'options':
         return instance.get('/api/v1/graduationsystemusingfacerecognition/registrations/options', { params: data || {} });
       case 'defaults':
@@ -342,6 +346,8 @@ export default {
         return instance.put(`/api/v1/graduationsystemusingfacerecognition/registrations/${data && (data.id || data._id)}/questionnaire`, data || {});
       case 'save-face-photo':
         return instance.put(`/api/v1/graduationsystemusingfacerecognition/registrations/${data && (data.id || data._id)}/face-photo`, data || {});
+      case 'update-admin-details':
+        return instance.put(`/api/v1/graduationsystemusingfacerecognition/registrations/${data && (data.id || data._id)}/admin-details`, data || {});
       case 'update-status':
         return instance.put(`/api/v1/graduationsystemusingfacerecognition/registrations/${data && (data.id || data._id)}/admin-status`, data || {});
       case 'delete':

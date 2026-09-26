@@ -1,16 +1,26 @@
 <template>
   <div class="face-registration-page">
+    <div v-if="isAdminScanner" class="admin-scanner-controls">
+      <div class="checkin-mode-strip">
+        <button
+          v-for="mode in checkInModes"
+          :key="mode.value"
+          type="button"
+          :class="['checkin-mode-button', activeCheckInMode === mode.value ? 'is-active' : '']"
+          @click="selectCheckInMode(mode.value)"
+        >
+          <strong>{{ mode.label }}</strong>
+        </button>
+      </div>
+    </div>
     <div class="page-header">
       <div>
-        <span class="page-header__step">ขั้นตอนที่ 4 จาก 4</span>
-        <h1>ลงทะเบียนใบหน้า</h1>
-        <p>
-          ถ่ายภาพใบหน้าให้ชัดเจน
-          เพื่อใช้ยืนยันตัวตนในวันเข้ารับพระราชทานปริญญาบัตร
-        </p>
+        <span class="page-header__step">{{ isAdminScanner ? 'ระบบเช็กชื่อบัณฑิต' : 'ขั้นตอนที่ 4 จาก 4' }}</span>
+        <h1>{{ isAdminScanner ? 'สแกนใบหน้าเพื่อเช็กชื่อ' : 'ลงทะเบียนใบหน้า' }}</h1>
       </div>
 
       <CButton
+        v-if="!isAdminScanner"
         color="secondary"
         variant="outline"
         @click="backToRegistration"
@@ -24,6 +34,7 @@
     </div>
 
     <div
+      v-if="!isAdminScanner"
       class="progress-steps"
       aria-label="ขั้นตอนการลงทะเบียน"
     >
@@ -167,10 +178,6 @@
             <div class="camera-heading">
               <div>
                 <h2>ถ่ายภาพใบหน้า</h2>
-
-                <p>
-                  {{ cameraInstruction }}
-                </p>
               </div>
 
               <span
@@ -217,11 +224,6 @@
                 <h3>
                   พร้อมลงทะเบียนใบหน้า
                 </h3>
-
-                <p>
-                  กด “เริ่มสแกนใบหน้า”
-                  และอนุญาตให้เว็บไซต์ใช้งานกล้อง
-                </p>
               </div>
 
               <div
@@ -269,7 +271,7 @@
                 {{
                   saveSuccess
                     ? 'บันทึกภาพลงฐานข้อมูลแล้ว'
-                    : 'กำลังบันทึกภาพลงฐานข้อมูล...'
+                    : (saveError ? 'บันทึกไม่สำเร็จ กรุณาลองอีกครั้ง' : 'กำลังบันทึกภาพลงฐานข้อมูล...')
                 }}
               </div>
             </div>
@@ -658,6 +660,7 @@ export default {
       detectionMetrics: null,
 
       registrationLoading: false,
+      adminRegistrations: [],
 
       animationFrameId: null,
       lastDetectAt: 0
@@ -669,6 +672,18 @@ export default {
   // ==========================================================
 
   computed: {
+    activeCheckInMode () {
+      return this.$route && this.$route.query.mode === 'ceremony' ? 'ceremony' : 'rehearsal'
+    },
+    checkInModes () {
+      return [
+        { value: 'rehearsal', label: 'วันซ้อม', note: 'ตรวจรายชื่อ ทดลองเช็กชื่อ และดูความพร้อมข้อมูล' },
+        { value: 'ceremony', label: 'วันจริง', note: 'ใช้ยืนยันตัวตนและติดตามบัณฑิตหน้างาน' }
+      ]
+    },
+    isAdminScanner () {
+      return !!(this.$route && this.$route.path === '/graduation/admin-face-scanner')
+    },
     currentProfile () {
       return (
         this.$store &&
@@ -989,7 +1004,7 @@ export default {
   // ==========================================================
 
   mounted () {
-    this.restoreDraft()
+    if (!this.isAdminScanner) this.restoreDraft()
     this.fetchRegistration()
   },
 
@@ -1001,8 +1016,11 @@ export default {
     currentProfile () {
       this.loadedDraftStorageKey = ''
 
-      this.restoreDraft()
+      if (!this.isAdminScanner) this.restoreDraft()
       this.fetchRegistration()
+    },
+    '$route.query.id' () {
+      if (this.isAdminScanner) this.fetchRegistration()
     }
   },
 
@@ -1013,8 +1031,40 @@ export default {
   methods: {
     backToRegistration () {
       this.$router.push(
-        '/graduation/register'
+        this.isAdminScanner ? '/graduation/checkin-dashboard' : '/graduation/register'
       )
+    },
+
+    selectAdminRegistration (event) {
+      const id = event && event.target ? event.target.value : ''
+      if (!id) {
+        this.$router.replace({ path: '/graduation/admin-face-scanner', query: { mode: this.activeCheckInMode } })
+        return
+      }
+      this.$router.replace({ path: '/graduation/admin-face-scanner', query: { id, mode: this.activeCheckInMode } })
+    },
+
+    resetAdminSelection () {
+      if (!this.isAdminScanner) return
+      this.stopCamera()
+      this.form = emptyForm()
+      this.registrationId = ''
+      this.storedBarcodeValue = ''
+      this.photoPreview = ''
+      this.savedAt = ''
+      this.saveSuccess = false
+      this.saveError = ''
+      this.cameraError = ''
+      this.detectionMetrics = null
+      this.scanState = null
+      this.goodFrames = 0
+    },
+
+    selectCheckInMode (mode) {
+      this.$router.replace({
+        path: '/graduation/admin-face-scanner',
+        query: Object.assign({}, this.$route.query, { mode })
+      })
     },
 
     // --------------------------------------------------------
@@ -1108,6 +1158,7 @@ export default {
     },
 
     persistDraft () {
+      if (this.isAdminScanner) return
       let payload = {}
 
       try {
@@ -1167,10 +1218,12 @@ export default {
 
     async fetchRegistration () {
       if (
+        !this.isAdminScanner && (
         !this.currentProfile ||
         !Object.keys(
           this.currentProfile
         ).length
+        )
       ) {
         return
       }
@@ -1179,6 +1232,18 @@ export default {
         true
 
       try {
+        if (this.isAdminScanner) {
+          const listResponse = await api.graduateRegistrations('list', { limit: 4000 })
+          const data = listResponse && listResponse.data && listResponse.data.data
+          this.adminRegistrations = data && Array.isArray(data.rows) ? data.rows : []
+          const requestedId = textValue(this.$route && this.$route.query && this.$route.query.id)
+          const row = requestedId
+            ? this.adminRegistrations.find(item => textValue(item._id || item.id) === requestedId)
+            : null
+          this.resetAdminSelection()
+          if (row) this.applyRegistration(row)
+          return
+        }
         const response =
           await api.graduateRegistrations(
             'defaults'
@@ -1194,7 +1259,9 @@ export default {
           this.applyRegistration(row)
         }
       } catch (error) {
-        // ใช้ข้อมูล localStorage ต่อ
+        if (this.isAdminScanner) {
+          this.saveError = 'โหลดรายชื่อบัณฑิตไม่สำเร็จ กรุณาโหลดหน้าใหม่อีกครั้ง'
+        }
       } finally {
         this.registrationLoading =
           false
@@ -1231,7 +1298,7 @@ export default {
       )
 
       this.form.email =
-        this.authEmail ||
+        (this.isAdminScanner ? '' : this.authEmail) ||
         normalizeEmailText(
           row.email
         ) ||
@@ -1254,7 +1321,8 @@ export default {
 
       if (
         facePhoto &&
-        !this.photoPreview
+        !this.photoPreview &&
+        !this.isAdminScanner
       ) {
         this.photoPreview =
           facePhoto
@@ -1328,6 +1396,10 @@ export default {
     async startCamera () {
       this.cameraError = ''
       this.saveError = ''
+      if (this.isAdminScanner && !this.registrationId) {
+        this.cameraError = 'กรุณาเลือกบัณฑิตสำหรับเช็กชื่อก่อนเปิดกล้อง'
+        return
+      }
 
       this.cameraLoading =
         true
@@ -1966,7 +2038,7 @@ export default {
 
       this.stopCamera()
 
-      this.persistDraft()
+      if (!this.isAdminScanner) this.persistDraft()
 
       await this.saveFacePhoto()
     },
@@ -2010,6 +2082,11 @@ export default {
               facePhotoSource:
                 FACE_SCAN_SOURCE,
 
+              checkInMode:
+                this.isAdminScanner
+                  ? this.activeCheckInMode
+                  : null,
+
               facePhotoDetection:
                 Object.assign(
                   {
@@ -2039,10 +2116,9 @@ export default {
         this.saveSuccess =
           true
 
-        markGraduationStep(
-          this.currentProfile,
-          'faceSaved'
-        )
+        if (!this.isAdminScanner) {
+          markGraduationStep(this.currentProfile, 'faceSaved')
+        }
       } catch (error) {
         this.saveSuccess =
           false
@@ -2141,6 +2217,72 @@ export default {
   padding: 4px;
   max-width: 1240px;
   margin: 0 auto;
+}
+
+.admin-registration-picker {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 16px 20px;
+  border: 1px solid #d8dee8;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.admin-scanner-controls {
+  margin-bottom: 20px;
+}
+
+.checkin-mode-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.checkin-mode-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 12px 16px;
+  color: #17233c;
+  text-align: center;
+  border: 1px solid #d8dee8;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.checkin-mode-button strong {
+  width: 100%;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.checkin-mode-button small {
+  color: #667085;
+}
+
+.checkin-mode-button.is-active {
+  border-color: #a51d1d;
+  background: #fff8f8;
+  box-shadow: inset 0 0 0 1px #a51d1d;
+}
+
+.admin-registration-picker label {
+  margin: 0;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.admin-registration-picker select {
+  width: 100%;
+  min-height: 40px;
+  padding: 7px 12px;
+  border: 1px solid #c8d0dc;
+  border-radius: 6px;
+  background: #fff;
 }
 
 .page-header {

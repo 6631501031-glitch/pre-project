@@ -16,7 +16,7 @@
 <!--          viewBox="0 0 556 134"-->
 <!--      />-->
       <div class="c-sidebar-brand-full" >
-        <a href="/">
+        <div class="sidebar-brand-label">
           <CRow >
             <img class="pt-2 pb-2" src="@/assets/logo.svg" height="60px">
             <CCol class="text-white">
@@ -24,7 +24,7 @@
               <p class="font-weight-bold">{{ $t('common.app.dashboardSystem') }}</p>
             </CCol>
           </CRow>
-        </a>
+        </div>
 
       </div>
 
@@ -39,10 +39,6 @@
       />
     </CSidebarBrand>
     <CRenderFunction flat :contentToRender="navs"/>
-    <CSidebarMinimizer
-        class="c-d-md-down-none"
-        @click.native="$store.commit('toggle', 'sidebarMinimize')"
-    />
   </CSidebar>
 </template>
 
@@ -87,7 +83,8 @@ export default {
       }
       filtered.forEach(group => {
         const children = Array.isArray(group && group._children) ? group._children : []
-        children.forEach(item => {
+        group._children = children
+        group._children.forEach(item => {
           if (this.isStudentLogin && item && [
             '/graduation/register',
             '/graduation/ceremony-preferences',
@@ -107,7 +104,7 @@ export default {
             item.disabled = !faceEnabled
             item.addLinkClasses = !faceEnabled ? 'graduation-step-link--disabled' : ''
           }
-          if (this.isStudentLogin && item && completedSteps[item.to]) {
+          if (this.isStudentLogin && item && completedSteps[item.to] && !item.disabled) {
             item.badge = { color: 'success', shape: 'pill', text: '✓' }
             item.addLinkClasses = 'graduation-step-link--completed'
           }
@@ -209,6 +206,7 @@ export default {
       const filtered = items.reduce((result, item) => {
         if (!item || typeof item !== 'object') return result
         if (item.adminOnly && this.isStudentLogin) return result
+        if (item.studentOnly && !this.isStudentLogin) return result
 
         if (item._name === 'CSidebarNavTitle') {
           result.push({ ...item })

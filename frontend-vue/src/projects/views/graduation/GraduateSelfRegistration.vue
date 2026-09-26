@@ -1034,6 +1034,7 @@ export default {
     },
     summaryProgram () {
       if (this.isEnglishLocale) {
+        if (textValue(this.form.programEnglish)) return textValue(this.form.programEnglish)
         const catalogProgram = this.findCatalogProgram(this.form.school, this.form.program)
         const catalogEnglish = textValue(catalogProgram && (catalogProgram.programEnglish || catalogProgram.labelEn))
         if (catalogEnglish) return catalogEnglish
@@ -1337,6 +1338,7 @@ export default {
       return !!(this.lockedFields && this.lockedFields[field])
     },
     applyFixedGraduateName () {
+      if (this.lockedFields.firstName === 'registration' || this.lockedFields.lastName === 'registration') return
       const initialDefaults = graduateInitialDefaults(this.graduateInitialRecord)
       if (initialDefaults.firstName || initialDefaults.lastName) {
         this.form.firstName = initialDefaults.firstName || ''
@@ -1579,8 +1581,8 @@ export default {
     syncCatalogLanguageFields () {
       const schoolItem = this.findCatalogSchool(this.form.school)
       const programItem = this.findCatalogProgram(this.form.school, this.form.program)
-      this.form.schoolEnglish = textValue(schoolItem && (schoolItem.schoolEnglish || schoolItem.labelEn)) || textValue(this.form.schoolEnglish)
-      this.form.programEnglish = textValue(programItem && (programItem.programEnglish || programItem.labelEn)) || textValue(this.form.programEnglish)
+      this.form.schoolEnglish = textValue(this.form.schoolEnglish) || textValue(schoolItem && (schoolItem.schoolEnglish || schoolItem.labelEn))
+      this.form.programEnglish = textValue(this.form.programEnglish) || textValue(programItem && (programItem.programEnglish || programItem.labelEn))
     },
     async fetchRegistrationOptions () {
       this.schoolProgramCatalog = SCHOOL_PROGRAM_CATALOG.slice()
@@ -1848,11 +1850,11 @@ export default {
       return Object.assign({}, this.form, {
         namePronunciation: this.namePronunciation,
         phone: this.composedPhone,
-        email: this.authEmail || normalizeEmailText(this.form.email),
+        email: normalizeEmailText(this.form.email) || this.authEmail,
         school: textValue(this.form.school),
-        schoolEnglish: textValue(schoolItem && (schoolItem.schoolEnglish || schoolItem.labelEn)) || textValue(this.form.schoolEnglish),
+        schoolEnglish: textValue(this.form.schoolEnglish) || textValue(schoolItem && (schoolItem.schoolEnglish || schoolItem.labelEn)),
         program: textValue(this.form.program),
-        programEnglish: textValue(programItem && (programItem.programEnglish || programItem.labelEn)) || textValue(this.form.programEnglish),
+        programEnglish: textValue(this.form.programEnglish) || textValue(programItem && (programItem.programEnglish || programItem.labelEn)),
         questionnaireEmploymentStatus: meaningfulOptionValue(this.form.questionnaireEmploymentStatus),
         questionnaireNote: textValue(this.form.questionnaireNote),
         currentAddressSameAsHome: this.currentAddressSameAsHome,

@@ -1,0 +1,354 @@
+[
+  {
+    "style": "papertitle",
+    "text": "Graduation Registration and Attendance Management Using Browser-Based Face Recognition"
+  },
+  {
+    "authorTable": [
+      [
+        "Thitirat Chuaypetch\nCE\nMae Fah Luang University\nThailand\n6631501031@lamduan.mfu.ac.th",
+        "Nattanicha Bunchuen\nCE\nMae Fah Luang University\nThailand\n6631501033@lamduan.mfu.ac.th",
+        "Kwankamolsri Jandee\nCE\nMae Fah Luang University\nThailand\n6631501015@lamduan.mfu.ac.th"
+      ],
+      [
+        "Teerasak Jeefu\nCE\nMae Fah Luang University\nThailand\n6631501057@lamduan.mfu.ac.th",
+        "Nataporn Dibdee\nCE\nMae Fah Luang University\nThailand\n6631501034@lamduan.mfu.ac.th",
+        ""
+      ]
+    ]
+  },
+  {
+    "style": "Affiliation",
+    "text": "Project advisor, if required: ____________________"
+  },
+  {
+    "section": "columns"
+  },
+  {
+    "style": "Abstract",
+    "text": "Abstract—This paper presents a web application that combines graduate registration, ceremony preferences, food allergy reporting, face enrollment, and attendance management. The student interface guides users through an employment questionnaire, personal and academic information, and ceremony arrangements before enabling face enrollment for eligible attendance categories. The administrator interface provides searchable registration records, aggregate statistics, editable graduate details, a paginated allergy roster, and separate rehearsal and ceremony attendance views. The implementation uses a Vue frontend, a Node.js backend, and MongoDB persistence. Face enrollment uses MediaPipe detection and image quality checks, while the administrator camera uses face-api.js descriptors, distance and ambiguity thresholds, and repeated observations to identify enrolled graduates. Targeted verification completed thirty-four frontend tests and nine backend tests. A development database check also confirmed that the allergy roster matched its aggregate count. These findings demonstrate implemented workflow behavior and selected regression checks; they do not establish recognition accuracy, resistance to presentation attacks, or production throughput. The paper documents the architecture, data model, recognition procedure, implementation findings, and remaining evaluation needs."
+  },
+  {
+    "style": "Keywords",
+    "text": "Keywords—graduation registration, face recognition, attendance management, web application, food allergy reporting"
+  },
+  {
+    "style": "Heading1",
+    "text": "Introduction"
+  },
+  {
+    "style": "BodyText",
+    "text": "Graduation administration involves several related tasks: collecting graduate information, recording participation intentions, arranging certificate delivery, preparing assistance and dietary requirements, and confirming attendance. A system that stores these details together can support staff preparation and reduce repeated entry between registration and event operations. However, combining the workflows also creates dependencies: a graduate should provide the required information before enrolling a reference image, and an attendance action should not overwrite that image."
+  },
+  {
+    "style": "BodyText",
+    "text": "This project implements a graduation registration and face recognition application for the Mae Fah Luang University context. The available repository contains a Vue application, a Node.js application programming interface (API), MongoDB models, identity integration, import utilities, deployment configuration, and automated tests [1]. The implementation was examined directly because some inherited documentation still describes a generic agreement-management template. This paper therefore describes the graduation features present in the current source, rather than treating all inherited documentation as implemented graduation requirements."
+  },
+  {
+    "style": "BodyText",
+    "text": "The project has three objectives. First, it provides a guided student workflow for questionnaire completion, graduate information, ceremony preferences, and reference-image enrollment. Second, it provides administrators with searchable records, editable registration details, operational summaries, and an actionable food allergy list. Third, it connects browser-side face matching to persistent attendance receipts for rehearsal and ceremony activities. The contribution is the integration of these functions and their consistency checks, rather than a new face recognition model."
+  },
+  {
+    "style": "Heading1",
+    "text": "Technical Background and System Scope"
+  },
+  {
+    "style": "Heading2",
+    "text": "Face Detection and Identity Matching"
+  },
+  {
+    "style": "BodyText",
+    "text": "Face detection locates a face in an image; it does not establish whose face is present. MediaPipe provides a web face detector that returns face locations and facial key points [2]. The enrollment module uses its short-range BlazeFace model as part of capture guidance and quality assessment. The administrator scanner uses face-api.js, whose documentation describes face detection, landmarks, and 128-value descriptors for identity comparison [3]. Keeping these purposes separate avoids interpreting a successful enrollment detection as a successful identity match."
+  },
+  {
+    "style": "BodyText",
+    "text": "The project uses existing model assets and browser inference. No training pipeline or newly trained model is demonstrated in the examined source. Matching thresholds and repeated observations are application decisions. Their presence can reject certain invalid or ambiguous inputs, but does not by itself demonstrate a calibrated false-acceptance rate or real-world recognition accuracy."
+  },
+  {
+    "style": "Heading2",
+    "text": "Actors and Functional Boundaries"
+  },
+  {
+    "style": "BodyText",
+    "text": "Students enter through the login page and work on their own graduation information. Administrators use the registration roster, check-in dashboard, and camera scanner. The student navigation is intentionally different from the administrator navigation. A stored session does not automatically redirect a visit to the login page, and a legacy student dashboard URL redirects to the student registration workflow. Student records display a full name, while the existing administrator name presentation is retained."
+  },
+  {
+    "style": "BodyText",
+    "text": "The operational scope includes contact and academic information, name pronunciation, addresses, employment questionnaire responses, ceremony status, assistance details, certificate delivery, food allergy notes, face enrollment, and attendance. The repository also includes account, permission, audit, notification, backup, and business-operation components inherited from its platform. Those components support the surrounding application infrastructure; this paper does not claim that every platform screen is part of the tested graduation workflow."
+  },
+  {
+    "style": "tablehead",
+    "text": "TABLE I. PRINCIPAL APPLICATION MODULES"
+  },
+  {
+    "table": [
+      [
+        "Actor / module",
+        "Implemented responsibility"
+      ],
+      [
+        "Student questionnaire",
+        "Employment status and additional questionnaire notes"
+      ],
+      [
+        "Student registration",
+        "Names, pronunciation, contact, school, program, and addresses"
+      ],
+      [
+        "Ceremony preferences",
+        "Participation, assistance, certificate delivery, and allergies"
+      ],
+      [
+        "Face enrollment",
+        "Guided capture and persistence of a reference photograph"
+      ],
+      [
+        "Admin registration",
+        "Search, filters, editing, statistics, and allergy roster"
+      ],
+      [
+        "Attendance operations",
+        "Continuous matching and separate rehearsal / ceremony receipts"
+      ]
+    ]
+  },
+  {
+    "style": "Heading1",
+    "text": "System Design"
+  },
+  {
+    "style": "Heading2",
+    "text": "Architecture"
+  },
+  {
+    "style": "BodyText",
+    "text": "The frontend uses Vue 2, Vue Router, Vuex, CoreUI components, and an API service layer. The backend uses Node.js and Express routes with Mongoose models. MongoDB stores registration records and attendance fields. Local development serves the frontend on port 8080 and the backend on port 8206. Docker and server deployment scripts are included, but their presence is not evidence of a completed production deployment. Table I summarizes the user-facing modules. Fig. 1 shows the main logical paths."
+  },
+  {
+    "figure": "architecture"
+  },
+  {
+    "style": "figurecaption",
+    "text": "Fig. 1. Logical application architecture. Face matching executes in the administrator browser; the backend validates requests and stores receipts."
+  },
+  {
+    "style": "BodyText",
+    "text": "The student browser sends questionnaire, registration, preference, and enrollment changes through the API. The administrator browser obtains the roster and aggregate summaries from the backend. For recognition, it retrieves reference images in cursor-based batches, computes descriptors locally, and compares them with camera frames. On a confirmed match, it submits the registration identifier, activity mode, and distance to the check-in endpoint. The backend returns a persisted receipt, which is then reflected in the scanner and attendance dashboard."
+  },
+  {
+    "style": "Heading2",
+    "text": "Registration Data Model"
+  },
+  {
+    "style": "BodyText",
+    "text": "The Graduate_Registration document stores student and barcode identifiers, names, pronunciation fields, phone and email, school and program labels, and home, current, and work addresses. It also stores ceremony status, assistance type and notes, certificate-delivery method and destination, allergy flags and notes, questionnaire responses, reference-photo metadata, and audit information. Separate latestCheckIns.rehearsal and latestCheckIns.ceremony fields retain the latest attendance receipt for each activity."
+  },
+  {
+    "style": "BodyText",
+    "text": "The reference photograph and attendance receipts serve different purposes. Enrollment establishes the image used for later comparison; check-in records the time and source of an accepted attendance event. The check-in mutation updates the selected activity field and audit information, without replacing the enrollment photograph or the other activity receipt. This separation prevents passing camera frames from progressively changing the reference image. The examined schema stores latest receipts, not a complete immutable history of all attendance events."
+  },
+  {
+    "style": "Heading2",
+    "text": "Workflow and Navigation"
+  },
+  {
+    "style": "BodyText",
+    "text": "The student sequence is questionnaire, registration information, ceremony preferences, and conditional face enrollment. Client-side workflow progress is stored per profile identity and is used for completion indicators and route checks. Attempts to reach later steps without the required earlier state redirect to the appropriate form. Face enrollment is enabled when the questionnaire, registration, and preferences are complete and the ceremony status belongs to an attendance category: 10, 20, 30, or 40. Non-attending arrangements can end after the preference step."
+  },
+  {
+    "style": "BodyText",
+    "text": "Statuses 50 and 60 require a certificate-receipt method. Postal delivery introduces a shipping service and destination address, while assistance-related choices expose their corresponding details. Allergy information is independent of the particular food entered. Client-side progress makes navigation understandable, but local browser state is not a substitute for server-side ownership and authorization checks."
+  },
+  {
+    "style": "Heading2",
+    "text": "Access and Identity Boundaries"
+  },
+  {
+    "style": "BodyText",
+    "text": "The backend applies authentication middleware and permission or local-session rules to graduation routes. Student update routes include ownership checks, and some operations bind the submitted identity to the authenticated student code. Administrative gallery and check-in routes use administrative or delegated-permission checks. The source also contains domain-based administrative shortcuts. These are implementation details requiring review before deployment; a displayed name or an email domain alone should not be treated as proof of an appropriate production authorization policy."
+  },
+  {
+    "style": "Heading1",
+    "text": "Implementation"
+  },
+  {
+    "style": "Heading2",
+    "text": "Registration, Search, and Administrative Editing"
+  },
+  {
+    "style": "BodyText",
+    "text": "The registration page presents names, pronunciation, contact details, academic information, and addresses alongside the saved face image. The administrative roster supports text search and school, program, and ceremony-status filters. Search actions start at page one, and the roster displays ten records per page. The frontend binds CoreUI select controls through their update:value contract so that the submitted filter matches the visible selection. Legacy ceremony values are normalized in the backend when selected statuses have historical equivalents."
+  },
+  {
+    "style": "BodyText",
+    "text": "A shared ceremony editor loads the selected graduate and updates supported administrative fields. The update flow preserves unrelated questionnaire, address, face, and attendance data. The student page retrieves saved registration values so that administrative corrections are not silently replaced by older account defaults. Aggregate cards are computed from the full registration dataset and remain independent of the currently displayed table page and filters. This distinction is necessary when a short visible list represents thousands of stored records."
+  },
+  {
+    "style": "Heading2",
+    "text": "Food Allergy Summary and Drill-Down"
+  },
+  {
+    "style": "BodyText",
+    "text": "The allergy card counts each registration once when hasFoodAllergy is yes or when a trimmed allergy note is nonempty and is not the placeholder hyphen. It does not require a predefined food vocabulary. A note such as several foods still contributes one person, rather than several allergy events. This rule matches the requested operational question: how many graduates have reported an allergy? It does not interpret severity or verify medical accuracy."
+  },
+  {
+    "style": "BodyText",
+    "text": "Selecting the card opens a dialog listing student identifier, full name, and the submitted allergy detail. The server applies the same flag-or-note rule to the filtered roster. Both the dialog and its API request use a page size of ten, with previous and next controls for larger lists. Loading, empty-result, and error states are handled separately. The implementation uses text interpolation for notes. The summary and drill-down are intended for preparation by authorized staff and are not a medical decision system."
+  },
+  {
+    "style": "Heading2",
+    "text": "Reference Image Enrollment"
+  },
+  {
+    "style": "BodyText",
+    "text": "The enrollment helper checks face count, confidence, relative face size, centering, head orientation, and brightness. Its configured minimum score is 0.6, acceptable face coverage is 0.26 to 0.80, and brightness limits are 42 to 242. Additional limits constrain horizontal and vertical offset, roll, and yaw. The interface provides capture guidance when a face is absent, multiple faces appear, or positioning and lighting are unsuitable. These are code-level settings rather than empirically optimized thresholds."
+  },
+  {
+    "style": "BodyText",
+    "text": "MediaPipe assets are loaded from local paths with fallback locations available in the helper. The saved record includes the photograph and associated capture information. Although geometric and lighting checks improve input consistency, this implementation should not be described as a validated liveness detector. The examined evidence does not establish protection against printed photographs or replayed video."
+  },
+  {
+    "style": "Heading2",
+    "text": "Continuous Recognition and Attendance"
+  },
+  {
+    "style": "BodyText",
+    "text": "The scanner loads face-api.js detection, 68-point landmark, and recognition networks. It obtains reference images in batches of twenty-five records and accepts a reference descriptor only when exactly one face is detected. Invalid reference images are skipped and counted. After preparing the gallery, the camera produces frames for detection and descriptor extraction. Descriptors are held in browser memory for comparison."
+  },
+  {
+    "style": "BodyText",
+    "text": "For a query descriptor q and reference descriptor g, the application computes Euclidean distance across 128 values. Candidates are sorted by distance. A candidate is accepted only when the best distance does not exceed 0.50 and, if a second candidate exists, the difference between the second-best and best distances is at least 0.08. Invalid query vectors, unknown faces, and near-ties are rejected. These settings belong to this application, not to a general guarantee made by the model library."
+  },
+  {
+    "style": "equation",
+    "text": "d(q, g) = sqrt(sum from i = 1 to 128 of (q_i - g_i)^2)     (1)"
+  },
+  {
+    "style": "BodyText",
+    "text": "An observation tracker additionally requires two consecutive observations of the same identity, with successive observations less than 2.5 seconds apart. Missing identities reset their tracking state. If multiple faces in a frame map to the same identity, that identity is excluded from confirmation for the frame. Processing continues after successful check-in; the scanner does not need to stop between graduates. A 250 ms scheduling delay follows each processing cycle, but this is not a measured frame rate because inference and network time also contribute."
+  },
+  {
+    "style": "BodyText",
+    "text": "The browser suppresses repeated submissions per identity and activity during the active scanner session. The backend independently validates the identifier, activity mode, and finite distance within the accepted range, and applies an atomic sixty-second duplicate window for that activity. A duplicate request returns the prior receipt. Failed writes do not create a successful local receipt and can be retried. Leaving the scanner stops media tracks and invalidates pending recognition work."
+  },
+  {
+    "style": "Heading1",
+    "text": "Verification and Findings"
+  },
+  {
+    "style": "Heading2",
+    "text": "Method"
+  },
+  {
+    "style": "BodyText",
+    "text": "Verification focused on the implementation available in the development workspace on September 23, 2026. Three frontend suites were executed with Jest: automatic check-in, ceremony administration, and permission landing. Two backend suites were executed with the Node.js test runner: automatic check-in and ceremony administration [4]. These are targeted regression tests, not a full audit of every route, browser, or deployment configuration. Table II summarizes their results."
+  },
+  {
+    "style": "tablehead",
+    "text": "TABLE II. EXECUTED TARGETED TEST SUITES"
+  },
+  {
+    "table": [
+      [
+        "Suite",
+        "Passed / executed"
+      ],
+      [
+        "Frontend: automatic check-in",
+        "11 / 11"
+      ],
+      [
+        "Frontend: ceremony administration",
+        "14 / 14"
+      ],
+      [
+        "Frontend: permission landing",
+        "9 / 9"
+      ],
+      [
+        "Backend: automatic check-in",
+        "4 / 4"
+      ],
+      [
+        "Backend: ceremony administration",
+        "5 / 5"
+      ],
+      [
+        "Total",
+        "43 / 43"
+      ]
+    ]
+  },
+  {
+    "style": "BodyText",
+    "text": "Recognition tests exercised synthetic descriptor matching, unknown and ambiguous rejection, observation expiry, repeated-write suppression, activity separation, and recovery from failed writes. Scanner tests also covered camera shutdown, persisted dashboard reloads, and paginated handling of a generated set of 3,000 receipts. The latter checks application list behavior and is not a camera throughput benchmark. Administrative tests covered shared editing, preserved fields, record totals, card interaction, and the selected search status."
+  },
+  {
+    "style": "Heading2",
+    "text": "Development Data Consistency"
+  },
+  {
+    "style": "BodyText",
+    "text": "Read-only checks of the development database observed 3,352 registration documents and three registrations matching the allergy rule. The allergy drill-down total equaled the aggregate card count. A status-10 search, including its supported legacy equivalent, returned 3,346 matches and ten records on its first page. These values describe the development data at the time of inspection. They are not a population estimate, a confirmed event attendance total, or a face-recognition benchmark."
+  },
+  {
+    "style": "BodyText",
+    "text": "The response-summary implementation classified all 3,352 records as responded under its current rule: a nonempty ceremony status other than 80. Accordingly, the displayed response rate was 100 percent in that snapshot. This reflects stored status values, including imported data, rather than independent evidence that every graduate personally completed the current web workflow. The paper reports the definition to avoid equating a dashboard percentage with a surveyed completion rate."
+  },
+  {
+    "style": "Heading2",
+    "text": "Limits of the Evidence"
+  },
+  {
+    "style": "BodyText",
+    "text": "All forty-three targeted tests passed. However, their success does not measure false acceptance, false rejection, recognition latency, or accuracy across lighting, pose, camera quality, and participant groups. No labeled face-image evaluation set, user study, or live-event benchmark was supplied. The manuscript therefore makes no numerical claim of biometric accuracy, time savings, or user satisfaction."
+  },
+  {
+    "style": "BodyText",
+    "text": "Several operational limitations remain. Gallery preparation computes descriptors from downloaded reference images and may grow costly as enrollment increases. Browser-generated recognition results are trusted by the backend after request and range validation; the backend does not independently recompute the descriptor match. A review-required dashboard counter exists, but the examined check-in write path does not set its reviewRequired flag. Consequently, a zero review count cannot establish that all recognitions were independently verified."
+  },
+  {
+    "style": "Heading1",
+    "text": "Discussion and Future Work"
+  },
+  {
+    "style": "BodyText",
+    "text": "The implemented system links preparation data with attendance operations in a single workflow. The allergy roster turns an aggregate count into a staff-readable list, while separate receipt fields allow rehearsal and ceremony to be monitored independently. Corrections to navigation, select bindings, card events, and administrative editing illustrate that practical reliability depends on interface behavior and data consistency as well as on face matching."
+  },
+  {
+    "style": "BodyText",
+    "text": "Before operational deployment, evaluation should use a consented, labeled dataset with separate enrollment and test captures. Trials should include unregistered people, similar appearances, multiple camera and lighting conditions, occlusion, and presentation attacks. False-acceptance and false-rejection rates, enrollment failure rate, latency distributions, and sustained throughput should be reported separately. Threshold selection should be performed on development data and then evaluated on held-out captures."
+  },
+  {
+    "style": "BodyText",
+    "text": "Further engineering work should review authorization shortcuts and the student authentication mechanism, define photo and attendance retention, limit access to health-related notes, and provide staff review and correction procedures. Improving gallery initialization, maintaining an append-only attendance history where required, and synchronizing workflow completion from server records are additional priorities. These are future tasks, not capabilities verified by the current test results."
+  },
+  {
+    "style": "Heading1",
+    "text": "Conclusion"
+  },
+  {
+    "style": "BodyText",
+    "text": "This project implements a graduation registration and attendance application covering student information, questionnaire responses, ceremony arrangements, food allergy reporting, face enrollment, and administrative check-in. Browser-side recognition combines descriptor distance, ambiguity rejection, and repeated observations, while backend persistence separates reference photographs from rehearsal and ceremony receipts. Forty-three targeted tests passed, and development-data checks confirmed consistency between the allergy card and its roster. The result is a documented functional prototype with verified workflow behaviors. Biometric performance, presentation-attack resistance, authorization hardening, and event-scale operation remain subjects for further evaluation."
+  },
+  {
+    "style": "Heading5",
+    "text": "References"
+  },
+  {
+    "style": "references",
+    "text": "[1] Graduation Registration and Face Recognition Project, \"Application source snapshot,\" unpublished software, frontend-vue and backend-node directories, inspected Sep. 23, 2026."
+  },
+  {
+    "style": "references",
+    "text": "[2] Google, \"Face detection guide for Web,\" Google AI Edge. [Online]. Available: https://developers.google.com/edge/mediapipe/solutions/vision/face_detector/web_js. Accessed: Sep. 23, 2026."
+  },
+  {
+    "style": "references",
+    "text": "[3] V. Muehlemann, \"face-api.js: JavaScript API for face detection and face recognition,\" project documentation. [Online]. Available: https://github.com/justadudewhohacks/face-api.js. Accessed: Sep. 23, 2026."
+  },
+  {
+    "style": "references",
+    "text": "[4] Graduation Registration and Face Recognition Project, \"Targeted frontend and backend regression tests,\" unpublished test artifacts, tests/unit/projects, tests/unit/router, and backend-node/test, executed Sep. 23, 2026."
+  }
+]

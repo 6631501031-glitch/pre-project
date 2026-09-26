@@ -58,38 +58,71 @@ router.post("/signin", function (request, response, next) {
       });
     });
   }
+function isLocalSession(request) {
+  const source = request && request.authSession ? request.authSession.source : '';
+  return source === 'local-student' || source === 'local-admin';
+}
+
+function hasIamSigninCredentials() {
+  const clientId = process.env.IAM_SDK_CLIENT_ID || process.env.IAM_ADMIN_CLIENT_ID || process.env.IAM_SDK_ADMIN_CLIENT_ID;
+  const clientSecret = process.env.IAM_SDK_CLIENT_SECRET || process.env.IAM_ADMIN_CLIENT_SECRET || process.env.IAM_SDK_ADMIN_CLIENT_SECRET;
+  return !!(String(clientId || '').trim() && String(clientSecret || '').trim());
+}
+
+function requireLamduanAccount(request, response, next) {
+  const email = String(request && request.body && request.body.email || '').trim().toLowerCase();
+  if (!email.endsWith('@lamduan.mfu.ac.th')) {
+    return response.status(403).json({
+      status: false,
+      code: 'AUTH_LAMDUAN_ACCOUNT_REQUIRED',
+      message: 'Please sign in with an @lamduan.mfu.ac.th account.'
+    });
+  }
+  request.localVerifiedLamduanSignin = true;
+  return next();
+}
+
+router.post("/signin", function (request, response, next) {
+  const isGoogleSignin = !!(request && request.body && request.body.token);
+  if (isGoogleSignin && !hasIamSigninCredentials()) {
+    return Account.verifyIdTokenGoogle(request, response, function () {
+      return requireLamduanAccount(request, response, function () {
+        return Account.SingIn(request, response, next);
+      });
+    });
+  }
   return iamAdminClient.forwardScopedSignin(request, response);
 });
 router.get("/auth/me", Account.onCheckAuthorization, function (request, response) {
-  if (isLocalStudentSession(request)) return Account.onMe(request, response);
+  if (isLocalSession(request)) return Account.onMe(request, response);
   return iamAdminClient.forwardUserRequest(request, response, {
     method: 'get',
     path: '/auth/me'
   });
 });
 router.get("/auth/sessions", Account.onCheckAuthorization, function (request, response) {
-  if (isLocalStudentSession(request)) return Account.onSessions(request, response);
+  if (isLocalSession(request)) return Account.onSessions(request, response);
   return iamAdminClient.forwardUserRequest(request, response, {
     method: 'get',
     path: '/auth/sessions'
   });
 });
 router.delete("/auth/sessions/:id", Account.onCheckAuthorization, function (request, response) {
-  if (isLocalStudentSession(request)) return Account.onRevokeSession(request, response);
+  if (isLocalSession(request)) return Account.onRevokeSession(request, response);
   return iamAdminClient.forwardUserRequest(request, response, {
     method: 'delete',
     path: `/auth/sessions/${String(request.params && request.params.id ? request.params.id : '')}`
   });
 });
 router.post("/auth/logout", Account.onCheckAuthorization, function (request, response) {
-  if (isLocalStudentSession(request)) return Account.onLogout(request, response);
+  if (isLocalSession(request)) return Account.onLogout(request, response);
   return iamAdminClient.forwardUserRequest(request, response, {
     method: 'post',
     path: '/auth/logout'
   });
 });
 router.post("/auth/logout-all", Account.onCheckAuthorization, function (request, response) {
-  if (isLocalStudentSession(request)) return Account.onLogoutAll(request, response);
+  if (isLocalSession(request)) return Account.onLogoutAll(request, response);
   return iamAdminClient.forwardUserRequest(request, response, {
     method: 'post',
     path: '/auth/logout-all'

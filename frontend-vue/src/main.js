@@ -1,4 +1,5 @@
 import 'core-js/stable'
+import '@/assets/fonts/noto-sans-thai/font.css'
 import Vue from 'vue'
 import CoreuiVuePro from '@coreui/vue-pro'
 // import CoreuiVuePro from '../node_modules/@coreui/vue-pro/src/index.js'

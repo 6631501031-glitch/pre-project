@@ -1,4 +1,6 @@
+import { en as automaticCheckin } from './automatic-checkin'
 const en = {
+    automaticCheckin,
     campus : "University Name",
     faculty: "Faculty",
     department: "Department",
@@ -1058,11 +1060,13 @@ en.graduation = {
             contact: "Contact",
             updatedAt: "Last saved"
         },
+        allergyList: {"loading":"Loading...","empty":"No graduates with food allergies.","studentCode":"Student ID"},
         stats: {
             total: "Total records",
             totalHint: "Data loaded from MongoDB",
             totalGraduates: "Total graduates",
             responded: "Intention submitted",
+            foodAllergy: "Graduates with food allergies",
             pending: "Intention not submitted",
             responseRate: "Form response rate",
             responseRateHint: "Of all graduates",

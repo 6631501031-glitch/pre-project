@@ -35,6 +35,21 @@ function isLocalStudent(request) {
   ) || !!localStudentCode(request);
 }
 
+function isLocalAdmin(request) {
+  const source = request && request.authSession ? request.authSession.source : '';
+  const current = request && (request.authAccount || request.currentAccount || request.account || request.user) || {};
+  const userinfo = current && current.userinfo && typeof current.userinfo === 'object' ? current.userinfo : {};
+  const email = String(current.email || userinfo.email || current.username || '').trim().toLowerCase();
+  return source === 'local-admin' || /^\d+@lamduan\.mfu\.ac\.th$/.test(email);
+}
+
+function allowLocalAdmin(permissionMiddleware) {
+  return function (request, response, next) {
+    if (isLocalAdmin(request)) return next();
+    return permissionMiddleware(request, response, next);
+  };
+}
+
 function localStudentCode(request) {
   const account = request && request.authAccount ? request.authAccount : {};
   const userinfo = account && account.userinfo ? account.userinfo : {};
@@ -66,6 +81,19 @@ function allowLocalStudent(permissionMiddleware, options) {
 
 router.use(account.onCheckAuthorization);
 
+router.get('/registrations/face-gallery', allowLocalAdmin(canViewRegistry), async function (request, response) {
+  try {
+    response.set('Cache-Control', 'no-store');
+    return ok(response, await graduateRegistration.faceGallery(request.query || {}));
+  } catch (error) { return fail(response, error); }
+});
+
+router.post('/registrations/:id/check-in', allowLocalAdmin(canViewRegistry), async function (request, response) {
+  try {
+    return ok(response, await graduateRegistration.checkIn(request.params.id, request.body || {}, request));
+  } catch (error) { return fail(response, error); }
+});
+
 router.get('/registrations/me/defaults', async function (request, response) {
   try {
     return ok(response, await graduateRegistration.defaultsForAccount(request, request.query || {}));
@@ -74,7 +102,7 @@ router.get('/registrations/me/defaults', async function (request, response) {
   }
 });
 
-router.get('/registrations/options', allowLocalStudent(canViewRegistry), async function (request, response) {
+router.get('/registrations/options', allowLocalAdmin(allowLocalStudent(canViewRegistry)), async function (request, response) {
   try {
     return ok(response, await graduateRegistration.options());
   } catch (error) {
@@ -82,7 +110,7 @@ router.get('/registrations/options', allowLocalStudent(canViewRegistry), async f
   }
 });
 
-router.get('/documents', canViewRegistry, async function (request, response) {
+router.get('/documents', allowLocalAdmin(canViewRegistry), async function (request, response) {
   try {
     return ok(response, await graduationsystemusingfacerecognitionDocument.list(request.query || {}));
   } catch (error) {
@@ -90,7 +118,7 @@ router.get('/documents', canViewRegistry, async function (request, response) {
   }
 });
 
-router.get('/registrations', canViewRegistry, async function (request, response) {
+router.get('/registrations', allowLocalAdmin(canViewRegistry), async function (request, response) {
   try {
     return ok(response, await graduateRegistration.list(request.query || {}));
   } catch (error) {
@@ -122,7 +150,7 @@ router.put('/registrations/:id/questionnaire', allowLocalStudent(canViewRegistry
   }
 });
 
-router.put('/registrations/:id/face-photo', allowLocalStudent(canViewRegistry, { requireOwnedRegistration: true }), async function (request, response) {
+router.put('/registrations/:id/face-photo', allowLocalAdmin(allowLocalStudent(canViewRegistry, { requireOwnedRegistration: true })), async function (request, response) {
   try {
     return ok(response, await graduateRegistration.saveFacePhoto(request.params.id, request.body || {}, request));
   } catch (error) {
@@ -130,7 +158,15 @@ router.put('/registrations/:id/face-photo', allowLocalStudent(canViewRegistry, {
   }
 });
 
-router.put('/registrations/:id/admin-status', canViewRegistry, async function (request, response) {
+router.put('/registrations/:id/admin-details', allowLocalAdmin(canViewRegistry), async function (request, response) {
+  try {
+    return ok(response, await graduateRegistration.updateAdminStatus(request.params.id, request.body || {}, request, true));
+  } catch (error) {
+    return fail(response, error);
+  }
+});
+
+router.put('/registrations/:id/admin-status', allowLocalAdmin(canViewRegistry), async function (request, response) {
   try {
     return ok(response, await graduateRegistration.updateAdminStatus(request.params.id, request.body || {}, request));
   } catch (error) {
@@ -138,7 +174,7 @@ router.put('/registrations/:id/admin-status', canViewRegistry, async function (r
   }
 });
 
-router.delete('/registrations/:id', canDeleteRegistry, async function (request, response) {
+router.delete('/registrations/:id', allowLocalAdmin(canDeleteRegistry), async function (request, response) {
   try {
     return ok(response, await graduateRegistration.remove(request.params.id));
   } catch (error) {

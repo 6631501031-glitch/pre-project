@@ -1,4 +1,6 @@
+import { th as automaticCheckin } from './automatic-checkin'
 const th = {
+    automaticCheckin,
 
     campus : "ชื่อสถาบันอุดมศึกษา",
     faculty: "สำนักวิชา",
@@ -1060,11 +1062,13 @@ th.graduation = {
             contact: "ติดต่อ",
             updatedAt: "บันทึกล่าสุด"
         },
+        allergyList: {"loading":"กำลังโหลด...","empty":"ไม่พบรายชื่อผู้แพ้อาหาร","studentCode":"รหัสนักศึกษา"},
         stats: {
             total: "รายการทั้งหมด",
             totalHint: "ข้อมูลที่โหลดจาก MongoDB",
             totalGraduates: "บัณฑิตทั้งหมด",
             responded: "แจ้งความประสงค์แล้ว",
+            foodAllergy: "ผู้แพ้อาหาร",
             pending: "ยังไม่แจ้งความประสงค์",
             responseRate: "อัตราการตอบแบบฟอร์ม",
             responseRateHint: "จากจำนวนบัณฑิตทั้งหมด",

@@ -5,7 +5,7 @@
         <h1>{{ $t('graduation.admin.title') }}</h1>
       </div>
       <div class="graduate-admin-header__actions">
-        <CButton color="primary" variant="outline" :disabled="loading" @click="fetchRegistrations">
+        <CButton color="primary" variant="outline" :disabled="loading" @click="fetchRegistrations(1)">
           <CIcon name="cil-reload" class="mr-2" />
           {{ $t('graduation.admin.actions.refresh') }}
         </CButton>
@@ -14,7 +14,14 @@
 
     <CRow class="graduate-admin-stats-row">
       <CCol v-for="item in statCards" :key="item.key" class="graduate-admin-stats-col">
-        <CCard class="graduate-admin-card graduate-admin-stat">
+        <CCard class="graduate-admin-card graduate-admin-stat"
+          :class="{ 'allergy-card-button': item.key === 'food-allergy' }"
+          :role="item.key === 'food-allergy' ? 'button' : null"
+          :tabindex="item.key === 'food-allergy' ? 0 : null"
+          @click="item.key === 'food-allergy' && openAllergyList()"
+          @keydown.enter="item.key === 'food-allergy' && openAllergyList()"
+          @keydown.space="onAllergyCardSpace($event, item)"
+        >
           <CCardBody class="graduate-admin-stat__body">
             <div :class="['graduate-admin-stat__icon', `graduate-admin-stat__icon--${item.tone}`]">
               <CIcon :name="item.icon" />
@@ -41,27 +48,26 @@
             v-model.trim="filters.q"
             class="graduate-admin-search"
             :placeholder="$t('graduation.admin.searchPlaceholder')"
-            @keyup.enter="fetchRegistrations"
+            @keyup.enter="fetchRegistrations(1)"
             @input="scheduleSearch"
           />
           <CSelect
-            v-model="filters.school"
+            :value.sync="filters.school"
             class="graduate-admin-school"
             :options="schoolFilterOptions"
-            @input="onSchoolFilterChange"
-            @change="onSchoolFilterChange"
+            @update:value="onSchoolFilterChange"
           />
           <CSelect
-            v-model="filters.program"
+            :value.sync="filters.program"
             class="graduate-admin-program"
             :options="programFilterOptions"
           />
           <CSelect
-            v-model="filters.ceremonyStatus"
+            :value.sync="filters.ceremonyStatus"
             class="graduate-admin-status"
             :options="localizedCeremonyStatusFilterOptions"
           />
-          <CButton color="primary" :disabled="loading" @click="fetchRegistrations">
+          <CButton color="primary" :disabled="loading" @click="fetchRegistrations(1)">
             <CIcon name="cil-magnifying-glass" class="mr-2" />
             {{ $t('graduation.admin.actions.search') }}
           </CButton>
@@ -118,16 +124,69 @@
             </tbody>
           </table>
         </div>
+        <div v-if="totalRegistrations" class="roster-pagination">
+          <div class="roster-pagination__summary">
+            <span>{{ $t('graduation.checkin.pagination.showing') }}</span>
+            <strong>{{ pageStart }}-{{ pageEnd }}</strong>
+            <span>{{ $t('graduation.checkin.pagination.ofNames', { total: totalRegistrations.toLocaleString('en-US') }) }}</span>
+          </div>
+          <div class="roster-pagination__controls">
+            <button type="button" class="pager-button" :disabled="loading || currentPage <= 1" @click="changePage(currentPage - 1)">
+              <CIcon name="cil-chevron-left" />
+              {{ $t('graduation.checkin.pagination.previous') }}
+            </button>
+            <div class="pager-current">
+              <span>{{ $t('graduation.checkin.pagination.page') }}</span>
+              <strong>{{ currentPage }}</strong>
+              <span>/ {{ totalPages }}</span>
+            </div>
+            <button type="button" class="pager-button" :disabled="loading || currentPage >= totalPages" @click="changePage(currentPage + 1)">
+              {{ $t('graduation.checkin.pagination.next') }}
+              <CIcon name="cil-chevron-right" />
+            </button>
+          </div>
+        </div>
       </CCardBody>
     </CCard>
+
+    <CModal :show.sync="allergyVisible" size="lg" :title="$t('graduation.admin.stats.foodAllergy')" color="danger">
+      <div v-if="allergyLoading" role="status">{{ $t('graduation.admin.allergyList.loading') }}</div>
+      <div v-else-if="allergyError" role="alert">
+        {{ allergyError }}
+        <CButton color="primary" @click="fetchAllergyList(allergyPage)">{{ $t('graduation.admin.actions.refresh') }}</CButton>
+      </div>
+      <template v-else>
+        <p v-if="!allergyRows.length">{{ $t('graduation.admin.allergyList.empty') }}</p>
+        <div v-else class="table-responsive">
+          <table class="table">
+            <thead><tr>
+              <th>{{ $t('graduation.admin.allergyList.studentCode') }}</th>
+              <th>{{ $t('graduation.admin.details.fullName') }}</th>
+              <th>{{ $t('graduation.fields.foodAllergyNote') }}</th>
+            </tr></thead>
+            <tbody><tr v-for="person in allergyRows" :key="person._id">
+              <td>{{ person.studentCode || person.barcodeValue || '-' }}</td>
+              <td>{{ fullName(person) }}</td>
+              <td class="allergy-note">{{ person.foodAllergyNote || '-' }}</td>
+            </tr></tbody>
+          </table>
+        </div>
+      </template>
+      <template #footer>
+        <CButton :disabled="allergyLoading || allergyPage <= 1" @click="fetchAllergyList(allergyPage - 1)">{{ $t('graduation.checkin.pagination.previous') }}</CButton>
+        <span>{{ allergyPage }} / {{ Math.max(1, Math.ceil(allergyTotal / allergyPageSize)) }}</span>
+        <CButton :disabled="allergyLoading || allergyPage * allergyPageSize >= allergyTotal" @click="fetchAllergyList(allergyPage + 1)">{{ $t('graduation.checkin.pagination.next') }}</CButton>
+      </template>
+    </CModal>
 
     <CModal
       :show.sync="detailsVisible"
       size="lg"
       :title="$t('graduation.admin.detailsTitle')"
-      color="primary"
+      color="danger"
     >
-      <div v-if="selectedRegistration" class="graduate-admin-details">
+      <GraduateCeremonyPreferences v-if="selectedRegistration && detailsEditMode" :key="selectedRegistration._id" admin-mode :registration-data="selectedRegistration" @saved="onCeremonySaved" />
+      <div v-if="selectedRegistration && !detailsEditMode" class="graduate-admin-details">
         <div>
           <span>{{ $t('graduation.admin.details.fullName') }}</span>
           <strong>{{ fullName(selectedRegistration) || '-' }}</strong>
@@ -154,7 +213,7 @@
           <span>{{ $t('graduation.admin.details.extraDetail') }}</span>
           <strong>{{ selectedRegistration.ceremonyStatusNote || '-' }}</strong>
         </div>
-        <div v-if="cleanStatusCode(selectedRegistration.ceremonyStatus) === '60'">
+        <div v-if="['50', '60'].includes(cleanStatusCode(selectedRegistration.ceremonyStatus))">
           <span>{{ $t('graduation.admin.details.certificateMethod') }}</span>
           <strong>{{ certificateDeliveryMethodLabel(selectedRegistration.certificateDeliveryMethod) }}</strong>
         </div>
@@ -186,15 +245,7 @@
           >
             <CIcon name="cil-pencil" />
           </CButton>
-          <CButton
-            v-else
-            color="success"
-            variant="outline"
-            :disabled="savingDetails"
-            @click="saveDetailsEdit"
-          >
-            บันทึก
-          </CButton>
+
           <CButton color="secondary" class="graduate-admin-close-button" @click="closeDetails">{{ $t('graduation.admin.actions.close') }}</CButton>
         </div>
       </template>
@@ -204,7 +255,8 @@
 
 <script>
 import api from '@/service/api'
-import { notifyError, notifySuccess } from '@/projects/utils/notify'
+import GraduateCeremonyPreferences from './GraduateCeremonyPreferences.vue'
+import { notifyError } from '@/projects/utils/notify'
 
 const CEREMONY_STATUS_OPTIONS = [
   { value: '10', key: '10' },
@@ -277,6 +329,7 @@ function uniqueLocalizedOptions(rows, valueKey, labelKey, isEnglish) {
 
 export default {
   name: 'GraduateRegistrationAdmin',
+  components: { GraduateCeremonyPreferences },
   data () {
     return {
       loading: false,
@@ -284,6 +337,17 @@ export default {
       errorMessage: '',
       registrations: [],
       filterSourceRegistrations: [],
+      currentPage: 1,
+      pageSize: 10,
+      totalRegistrations: 0,
+      allergyVisible: false,
+      allergyLoading: false,
+      allergyError: '',
+      allergyRows: [],
+      allergyPage: 1,
+      allergyPageSize: 10,
+      allergyTotal: 0,
+      registrationSummary: { total: 0, responded: 0, foodAllergy: 0 },
       detailsVisible: false,
       selectedRegistration: null,
       detailsEditMode: false,
@@ -300,6 +364,15 @@ export default {
     }
   },
   computed: {
+    totalPages () {
+      return Math.max(Math.ceil(this.totalRegistrations / this.pageSize), 1)
+    },
+    pageStart () {
+      return this.totalRegistrations ? ((this.currentPage - 1) * this.pageSize) + 1 : 0
+    },
+    pageEnd () {
+      return Math.min(this.currentPage * this.pageSize, this.totalRegistrations)
+    },
     isEnglishLocale () {
       return String((this.$i18n && this.$i18n.locale) || '').toLowerCase().startsWith('en')
     },
@@ -335,12 +408,8 @@ export default {
       ]
     },
     statCards () {
-      const total = this.registrations.length
-      const responded = this.registrations.filter(item => {
-        const status = normalizeCeremonyStatus(item.ceremonyStatus)
-        return status && status !== '80'
-      }).length
-      const pending = Math.max(total - responded, 0)
+      const total = this.registrationSummary.total
+      const responded = this.registrationSummary.responded
       const responseRate = total ? (responded / total) * 100 : 0
       const peopleUnit = this.$t('graduation.admin.stats.peopleUnit')
 
@@ -363,13 +432,12 @@ export default {
           tone: 'success'
         },
         {
-          key: 'pending',
-          label: this.$t('graduation.admin.stats.pending'),
-          displayValue: pending.toLocaleString(),
+          key: 'food-allergy',
+          label: this.$t('graduation.admin.stats.foodAllergy'),
+          displayValue: (this.registrationSummary.foodAllergy || 0).toLocaleString(),
           unit: peopleUnit,
-          hint: `${(100 - responseRate).toFixed(2)}%`,
-          icon: 'cil-user-unfollow',
-          tone: 'warning'
+          icon: 'cil-warning',
+          tone: 'primary'
         },
         {
           key: 'response-rate',
@@ -390,6 +458,31 @@ export default {
     if (this.searchDebounceTimer) clearTimeout(this.searchDebounceTimer)
   },
   methods: {
+    onAllergyCardSpace (event, item) {
+      if (item.key !== 'food-allergy') return
+      event.preventDefault()
+      this.openAllergyList()
+    },
+    openAllergyList () {
+      this.allergyVisible = true
+      this.fetchAllergyList(1)
+    },
+    async fetchAllergyList (page = 1) {
+      this.allergyLoading = true
+      this.allergyError = ''
+      this.allergyPage = page
+      try {
+        const response = await api.graduateRegistrations('list', { foodAllergy: true, page, limit: this.allergyPageSize, includePhotos: false })
+        const data = unwrap(response)
+        this.allergyRows = Array.isArray(data.rows) ? data.rows : []
+        this.allergyTotal = Number(data.total) || 0
+      } catch (error) {
+        this.allergyRows = []
+        this.allergyError = this.$t('graduation.admin.messages.loadError')
+      } finally {
+        this.allergyLoading = false
+      }
+    },
     scheduleSearch () {
       if (this.searchDebounceTimer) clearTimeout(this.searchDebounceTimer)
       this.searchDebounceTimer = setTimeout(() => {
@@ -399,14 +492,14 @@ export default {
     },
     async fetchFilterSourceRegistrations () {
       try {
-        const response = await api.graduateRegistrations('list', { limit: 4000 })
+        const response = await api.graduateRegistrations('list', { limit: 4000, includePhotos: false })
         const data = unwrap(response)
         this.filterSourceRegistrations = Array.isArray(data.rows) ? data.rows : []
       } catch (error) {
         this.filterSourceRegistrations = []
       }
     },
-    async fetchRegistrations () {
+    async fetchRegistrations (page = 1) {
       if (this.searchDebounceTimer) {
         clearTimeout(this.searchDebounceTimer)
         this.searchDebounceTimer = null
@@ -419,10 +512,17 @@ export default {
           school: this.filters.school,
           program: this.filters.program,
           ceremonyStatus: this.filters.ceremonyStatus,
-          limit: 4000
+          page,
+          limit: this.pageSize,
+          includeSummary: true,
+          includePhotos: false
         })
         const data = unwrap(response)
         this.registrations = Array.isArray(data.rows) ? data.rows : []
+        this.totalRegistrations = Number(data.total) || 0
+        if (!data.summary) throw new Error('Missing registration summary')
+        this.registrationSummary = data.summary
+        this.currentPage = Number(data.page) || page
       } catch (error) {
         this.errorMessage = this.$t('graduation.admin.messages.loadError')
         notifyError(this.$store, this.errorMessage)
@@ -436,6 +536,10 @@ export default {
       this.filters.program = 'all'
       this.filters.ceremonyStatus = 'all'
       this.fetchRegistrations()
+    },
+    changePage (page) {
+      const nextPage = Math.min(Math.max(Number(page) || 1, 1), this.totalPages)
+      if (nextPage !== this.currentPage) this.fetchRegistrations(nextPage)
     },
     onSchoolFilterChange (value) {
       const nextSchool = value && value.target ? value.target.value : value
@@ -459,37 +563,14 @@ export default {
       this.detailsForm.ceremonyStatus = normalizeCeremonyStatus(this.selectedRegistration.ceremonyStatus)
       this.detailsEditMode = true
     },
-    async saveDetailsEdit () {
-      if (!this.selectedRegistration || !this.selectedRegistration._id) return
-      this.savingDetails = true
-      try {
-        const ceremonyStatus = normalizeCeremonyStatus(this.detailsForm.ceremonyStatus)
-        const payload = {
-          _id: this.selectedRegistration._id,
-          adminStatusUpdate: true,
-          ceremonyAssistanceType: this.selectedRegistration.ceremonyAssistanceType,
-          ceremonyStatus: ceremonyStatus
-        }
-        const response = await api.graduateRegistrations('update-status', payload)
-        const updatedRegistration = response && response.data && response.data.data
-          ? response.data.data
-          : payload
-        this.selectedRegistration = Object.assign({}, this.selectedRegistration, updatedRegistration)
-        const index = this.registrations.findIndex(item => item && item._id === payload._id)
-        if (index !== -1) {
-          this.$set(this.registrations, index, Object.assign({}, this.registrations[index], updatedRegistration))
-        }
-        const sourceIndex = this.filterSourceRegistrations.findIndex(item => item && item._id === payload._id)
-        if (sourceIndex !== -1) {
-          this.$set(this.filterSourceRegistrations, sourceIndex, Object.assign({}, this.filterSourceRegistrations[sourceIndex], updatedRegistration))
-        }
-        this.detailsEditMode = false
-        notifySuccess(this.$store, 'บันทึกสถานะเข้ารับแล้ว')
-      } catch (error) {
-        notifyError(this.$store, 'บันทึกสถานะเข้ารับไม่สำเร็จ')
-      } finally {
-        this.savingDetails = false
+    onCeremonySaved (updatedRegistration) {
+      this.selectedRegistration = Object.assign({}, this.selectedRegistration, updatedRegistration)
+      for (const rows of [this.registrations, this.filterSourceRegistrations]) {
+        const index = rows.findIndex(item => item._id === updatedRegistration._id)
+        if (index !== -1) this.$set(rows, index, Object.assign({}, rows[index], updatedRegistration))
       }
+      this.detailsEditMode = false
+      this.fetchRegistrations(this.currentPage)
     },
     fullName (item) {
       return [item && item.firstName, item && item.lastName].filter(Boolean).join(' ')
@@ -701,6 +782,73 @@ export default {
 .graduate-admin-table-wrap {
   overflow-x: auto;
 }
+.roster-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid #eef2f7;
+  border-radius: 8px;
+  color: #6b7280;
+  background: #fbfcff;
+}
+.roster-pagination__summary,
+.roster-pagination__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.roster-pagination__summary strong {
+  min-width: 74px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: #8c1515;
+  background: #fff1f1;
+  font-weight: 900;
+  text-align: center;
+}
+.pager-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #fff;
+}
+.pager-current strong {
+  color: #111827;
+  font-size: 18px;
+  font-weight: 900;
+}
+.pager-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #321fdb;
+  border-radius: 999px;
+  color: #321fdb;
+  background: #fff;
+  font-weight: 800;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.pager-button:hover:not(:disabled) {
+  color: #fff;
+  background: #321fdb;
+}
+.pager-button:disabled {
+  border-color: #d8dee9;
+  color: #a0aec0;
+  background: #f8fafc;
+  cursor: not-allowed;
+}
 .graduate-admin-table {
   width: 100%;
   min-width: 980px;
@@ -805,6 +953,16 @@ export default {
     min-height: 76px;
     padding: 12px 14px;
   }
+  .roster-pagination {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .roster-pagination__controls {
+    width: 100%;
+  }
+  .pager-button {
+    flex: 1 1 auto;
+  }
 }
 @media (min-width: 769px) and (max-width: 1199px) {
   .graduate-admin-stats-col {
@@ -812,4 +970,10 @@ export default {
     max-width: 50%;
   }
 }
+</style>
+
+<style scoped>
+.allergy-card-button { cursor: pointer; }
+.allergy-card-button:hover, .allergy-card-button:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+.allergy-note { white-space: pre-wrap; overflow-wrap: anywhere; }
 </style>

@@ -1,5 +1,13 @@
 <template>
   <div class="c-app flex-row align-items-center">
+    <button
+      type="button"
+      class="login-language"
+      :aria-label="lang === 'th' ? 'Switch to English' : 'เปลี่ยนเป็นภาษาไทย'"
+      @click="toggleLanguage"
+    >
+      {{ lang.toUpperCase() }}
+    </button>
     <CContainer>
       <CRow class="justify-content-center">
         <CCol md="6" lg="5">
@@ -7,17 +15,14 @@
             <CCardBody>
               <div class="login-brand">
                 <img src="@/assets/logo.svg" height="118px" alt="MFU" />
-                <h3 class="admin-login-title">เข้าสู่ระบบผู้ดูแล</h3>
-                <p class="admin-login-description">เข้าสู่ระบบด้วยบัญชี MFU Google @lamduan.mfu.ac.th</p>
-                <h3>เข้าสู่ระบบนักศึกษา</h3>
-                <p>กรอกรหัสนักศึกษาเพื่อเข้าสู่ระบบ ไม่ต้องใช้รหัสผ่าน</p>
+                <h3>{{ copy.title }}</h3>
               </div>
               <CForm v-if="false" class="student-login-form" @submit.prevent="onAuthenStudent">
                 <CInput
                   ref="studentCodeField"
                   v-model.trim="studentCode"
-                  label="รหัสนักศึกษา"
-                  placeholder="กรอกรหัสนักศึกษา"
+                  :label="copy.studentCode"
+                  :placeholder="copy.studentCodePlaceholder"
                   autocomplete="username"
                   inputmode="numeric"
                   pattern="[0-9]*"
@@ -33,12 +38,13 @@
                   type="submit"
                   :disabled="submitting || !studentCode"
                 >
-                  เข้าสู่ระบบ
+                  {{ copy.signIn }}
                 </CButton>
               </CForm>
+              <div class="login-divider"><span>หรือ</span></div>
               <CButton color="light" variant="outline" class="google-login-button" :disabled="submitting" @click="onAuthenGoogle">
                 <img src="@/assets/icons/logo-google.png" width="22" height="22" alt="" />
-                เข้าสู่ระบบด้วย MFU Google
+                {{ copy.googleSignIn }}
               </CButton>
             </CCardBody>
           </CCard>
@@ -69,7 +75,37 @@ export default {
       submitting: false
     }
   },
+  computed: {
+    lang () {
+      return this.$store.getters['setting/lang'] || 'th'
+    },
+    copy () {
+      if (this.lang === 'en') {
+        return {
+          title: 'Student Sign In',
+          studentCode: 'Student ID',
+          studentCodePlaceholder: 'Enter your student ID',
+          signIn: 'Sign In',
+          or: 'or',
+          googleSignIn: 'Administrator sign in with MFU email',
+          codeRequired: 'Please enter your student ID'
+        }
+      }
+      return {
+        title: 'เข้าสู่ระบบนักศึกษา',
+        studentCode: 'รหัสนักศึกษา',
+        studentCodePlaceholder: 'กรอกรหัสนักศึกษา',
+        signIn: 'เข้าสู่ระบบ',
+        or: 'หรือ',
+        googleSignIn: 'ผู้ดูแลเข้าสู่ระบบด้วยอีเมล MFU',
+        codeRequired: 'กรุณากรอกรหัสนักศึกษา'
+      }
+    }
+  },
   methods: {
+    toggleLanguage () {
+      this.$store.commit('setting/lang', this.lang === 'th' ? 'en' : 'th')
+    },
     onStudentCodeKeydown (event) {
       const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'Escape', 'ArrowLeft', 'ArrowRight', 'Home', 'End']
       if (!event || allowedKeys.includes(event.key) || event.ctrlKey || event.metaKey) return
@@ -89,7 +125,7 @@ export default {
       if (!username) {
         this.$store.commit('dialog/dialog', {
           title: 'Authentication Error',
-          message: 'กรุณากรอกรหัสนักศึกษา',
+          message: this.copy.codeRequired,
           code: 'AUTH_STUDENT_CODE_REQUIRED',
           number: '1',
           status: true
@@ -137,9 +173,37 @@ export default {
 
 <style scoped>
 .login-card {
+  position: relative;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   box-shadow: 0 16px 38px rgba(15, 23, 42, 0.14);
+}
+.login-language {
+  position: fixed;
+  z-index: 10;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 1px solid #3399ff;
+  border-radius: 50%;
+  color: #3399ff;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 400;
+  cursor: pointer;
+}
+.login-language:hover {
+  color: #fff;
+  background: #3399ff;
+}
+.login-language:focus {
+  outline: 2px solid rgba(51, 153, 255, 0.25);
+  outline-offset: 2px;
 }
 .login-brand {
   text-align: center;
