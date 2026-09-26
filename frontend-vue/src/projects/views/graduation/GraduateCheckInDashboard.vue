@@ -4,16 +4,6 @@
       <div>
         <h1>{{ $t('graduation.checkin.title') }}</h1>
       </div>
-      <div class="checkin-dashboard-header__actions">
-        <CButton color="primary" variant="outline" :disabled="loading" @click="fetchRegistrations">
-          <CIcon name="cil-reload" class="mr-2" />
-          {{ $t('graduation.checkin.actions.refresh') }}
-        </CButton>
-        <CButton color="success" @click="$router.push('/graduation/face-checkin')">
-          <CIcon name="cil-camera" class="mr-2" />
-          {{ $t('graduation.checkin.actions.openCheckin') }}
-        </CButton>
-      </div>
     </div>
 
     <div v-if="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
@@ -27,7 +17,6 @@
         @click="activeMode = mode.value"
       >
         <span>{{ mode.label }}</span>
-        <small>{{ mode.note }}</small>
       </button>
     </div>
 
@@ -39,23 +28,7 @@
         <div>
           <span>{{ item.label }}</span>
           <strong>{{ item.value }}</strong>
-          <small>{{ item.hint }}</small>
         </div>
-      </div>
-    </div>
-
-    <div class="simulation-grid">
-      <div v-for="item in simulatedModeStats" :key="item.key" class="simulation-card" :class="{ 'is-active': activeMode === item.key }">
-        <div>
-          <span>{{ item.label }}</span>
-          <strong>{{ item.checkedIn.toLocaleString('en-US') }}</strong>
-          <small>{{ $t('graduation.checkin.progress.checkedFrom', { total: item.total.toLocaleString('en-US') }) }}</small>
-        </div>
-        <div class="simulation-card__meta">
-          <b>{{ item.rate }}%</b>
-          <span>{{ $t('graduation.checkin.progress.pendingReview', { pending: item.pending.toLocaleString('en-US'), review: item.review.toLocaleString('en-US') }) }}</span>
-        </div>
-        <i><em :style="{ width: item.rate + '%' }"></em></i>
       </div>
     </div>
 
@@ -64,7 +37,6 @@
         <div class="panel-heading">
           <div>
             <h2>{{ $t('graduation.checkin.roster.title') }}</h2>
-            <p>{{ $t('graduation.checkin.roster.subtitle') }}</p>
           </div>
           <CInput
             v-model.trim="searchText"
@@ -79,7 +51,7 @@
               <tr>
                 <th>{{ $t('graduation.checkin.roster.graduate') }}</th>
                 <th>{{ $t('graduation.checkin.roster.schoolProgram') }}</th>
-                <th></th>
+                <th>{{ $t('automaticCheckin.detectedAt') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -98,10 +70,8 @@
                   <strong>{{ localizedSchool(item) || '-' }}</strong>
                   <span>{{ localizedProgram(item) || '-' }}</span>
                 </td>
-                <td class="row-actions">
-                  <CButton size="sm" color="primary" variant="outline" @click="$router.push('/graduation/face-checkin')">
-                    {{ $t('graduation.checkin.actions.checkin') }}
-                  </CButton>
+                <td class="scan-time">
+                  <strong>{{ formatScanDate((latestCheckIn(item) || {}).capturedAt) }}</strong>
                 </td>
               </tr>
             </tbody>
@@ -158,14 +128,25 @@ function textValue (value) {
   return text && text !== '-' ? text : ''
 }
 
+const modeStorageKey = 'graduate-checkin-dashboard-mode'
+
+function savedMode () {
+  try {
+    return window.localStorage.getItem(modeStorageKey) === 'ceremony' ? 'ceremony' : 'rehearsal'
+  } catch (_) {
+    return 'rehearsal'
+  }
+}
+
 export default {
   name: 'GraduateCheckInDashboard',
   data () {
     return {
       loading: false,
+      fetching: false,
       errorMessage: '',
       searchText: '',
-      activeMode: 'rehearsal',
+      activeMode: savedMode(),
       currentPage: 1,
       pageSize: 100,
       registrations: []
@@ -182,36 +163,29 @@ export default {
       return String((this.$i18n && this.$i18n.locale) || '').toLowerCase().startsWith('en')
     },
     metricCards () {
-      const total = this.registrations.length
-      const stats = this.mockCheckInStats
+      const total = this.scannedRegistrations.length
+      const verified = this.scannedRegistrations.filter(item => !(this.latestCheckIn(item).detection && this.latestCheckIn(item).detection.reviewRequired)).length
+      const review = Math.max(total - verified, 0)
+      const latest = this.scannedRegistrations[0]
       return [
-        { key: 'total', icon: 'cil-people', label: this.$t('graduation.checkin.metrics.total'), value: total.toLocaleString('en-US'), hint: this.$t('graduation.checkin.metrics.totalHint') },
-        { key: 'checked', icon: 'cil-check-circle', label: this.$t('graduation.checkin.metrics.checked'), value: stats.checkedIn.toLocaleString('en-US'), hint: this.$t('graduation.checkin.metrics.checkedHint', { rate: stats.rate, mode: stats.label }) },
-        { key: 'pending', icon: 'cil-clock', label: this.$t('graduation.checkin.metrics.pending'), value: stats.pending.toLocaleString('en-US'), hint: this.$t('graduation.checkin.metrics.pendingHint') },
-        { key: 'review', icon: 'cil-warning', label: this.$t('graduation.checkin.metrics.review'), value: stats.review.toLocaleString('en-US'), hint: this.$t('graduation.checkin.metrics.reviewHint') }
+        { key: 'total', icon: 'cil-people', label: this.$t('automaticCheckin.detectedTotal'), value: total.toLocaleString('en-US'), hint: this.$t('automaticCheckin.detectedHint') },
+        { key: 'checked', icon: 'cil-check-circle', label: this.$t('automaticCheckin.verified'), value: verified.toLocaleString('en-US'), hint: this.activeMode === 'ceremony' ? this.$t('automaticCheckin.ceremony') : this.$t('automaticCheckin.rehearsal') },
+        { key: 'review', icon: 'cil-warning', label: this.$t('automaticCheckin.review'), value: review.toLocaleString('en-US'), hint: this.$t('automaticCheckin.reviewHint') },
+        { key: 'latest', icon: 'cil-clock', label: this.$t('automaticCheckin.latest'), value: latest ? this.formatScanDate(this.latestCheckIn(latest).capturedAt) : '-', hint: this.$t('automaticCheckin.latestHint') }
       ]
     },
-    mockCheckInStats () {
-      return this.simulatedModeStats.find(item => item.key === this.activeMode) || this.simulatedModeStats[0]
-    },
-    simulatedModeStats () {
-      const total = this.registrations.length
-      const configs = [
-        { key: 'rehearsal', label: this.$t('graduation.checkin.modes.rehearsal.label'), checkedRatio: 0.78, reviewRatio: 0.035 },
-        { key: 'ceremony', label: this.$t('graduation.checkin.modes.ceremony.label'), checkedRatio: 0.64, reviewRatio: 0.018 }
-      ]
-      return configs.map(config => {
-        const checkedIn = Math.min(Math.round(total * config.checkedRatio), total)
-        const review = Math.min(Math.round(total * config.reviewRatio), Math.max(total - checkedIn, 0))
-        const pending = Math.max(total - checkedIn, 0)
-        const rate = total ? Math.round((checkedIn / total) * 100) : 0
-        return Object.assign({}, config, { total, checkedIn, pending, review, rate })
-      })
+    scannedRegistrations () {
+      return this.registrations
+        .filter(item => !!this.latestCheckIn(item))
+        .sort((left, right) => new Date(this.latestCheckIn(right).capturedAt).getTime() - new Date(this.latestCheckIn(left).capturedAt).getTime())
     },
     filteredRegistrations () {
       const query = textValue(this.searchText).toLowerCase()
-      if (!query) return this.registrations
-      return this.registrations.filter(item => [
+      const rows = this.scannedRegistrations
+      if (!query) return rows
+      return rows.filter(item => [
+        item && item.studentCode,
+        item && item.barcodeValue,
         item && item.firstName,
         item && item.lastName,
         item && item.phone,
@@ -237,6 +211,12 @@ export default {
     }
   },
   watch: {
+    activeMode (mode) {
+      this.currentPage = 1
+      try {
+        window.localStorage.setItem(modeStorageKey, mode)
+      } catch (_) { /* Attendance remains available when storage is disabled. */ }
+    },
     searchText () {
       this.currentPage = 1
     },
@@ -246,19 +226,38 @@ export default {
   },
   mounted () {
     this.fetchRegistrations()
+    this.refreshTimer = window.setInterval(() => this.fetchRegistrations(true), 10000)
+  },
+  beforeDestroy () {
+    window.clearInterval(this.refreshTimer)
   },
   methods: {
-    async fetchRegistrations () {
-      this.loading = true
+    latestCheckIn (item) {
+      const checkIns = item && item.latestCheckIns
+      const latest = checkIns && checkIns[this.activeMode]
+      return latest && textValue(latest.capturedAt) ? latest : null
+    },
+    async fetchRegistrations (background = false) {
+      if (this.fetching) return
+      this.fetching = true
+      if (!background) this.loading = true
       this.errorMessage = ''
       try {
-        const response = await api.graduateRegistrations('list', { limit: 4000 })
-        this.registrations = unwrapRows(response)
+        let page = 1
+        let hasMore = false
+        const rows = []
+        do {
+          const response = await api.graduateRegistrations('list', { limit: 4000, page, includePhotos: false, sortBy: 'attendance' })
+          rows.push(...unwrapRows(response))
+          hasMore = !!(response.data && response.data.data && response.data.data.hasMore)
+          page += 1
+        } while (hasMore)
+        this.registrations = rows
       } catch (error) {
         this.errorMessage = this.$t('graduation.checkin.loadError')
-        this.registrations = []
       } finally {
         this.loading = false
+        this.fetching = false
       }
     },
     fullName (item) {
@@ -273,6 +272,15 @@ export default {
       return this.isEnglishLocale && textValue(item && item.programEnglish)
         ? textValue(item.programEnglish)
         : textValue(item && item.program)
+    },
+    formatScanDate (value) {
+      if (!value) return '-'
+      const date = new Date(value)
+      if (isNaN(date.getTime())) return '-'
+      return date.toLocaleString(this.isEnglishLocale ? 'en-GB' : 'th-TH', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+      })
     }
   }
 }
@@ -308,20 +316,21 @@ export default {
   margin-bottom: 16px;
 }
 .mode-button {
-  display: grid;
-  gap: 3px;
-  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 12px 16px;
   border: 1px solid #d8dee9;
   border-radius: 8px;
   background: #fff;
-  text-align: left;
+  text-align: center;
 }
 .mode-button span {
+  width: 100%;
   color: #111827;
-  font-weight: 800;
-}
-.mode-button small {
-  color: #6b7280;
+  font-size: 14px;
+  font-weight: 600;
 }
 .mode-button.is-active {
   border-color: #8c1515;
@@ -356,7 +365,7 @@ export default {
   gap: 12px;
   align-items: center;
   min-width: 0;
-  padding: 16px;
+  padding: 12px 16px;
 }
 .metric-card__icon {
   display: inline-flex;
@@ -369,8 +378,6 @@ export default {
   background: #fff1f1;
 }
 .metric-card span,
-.metric-card small,
-.panel-heading p,
 .roster-table span {
   color: #6b7280;
 }
@@ -379,6 +386,12 @@ export default {
   color: #111827;
   font-size: 24px;
   font-weight: 800;
+}
+.metric-card:last-child strong {
+  font-size: 18px;
+}
+.scan-time {
+  white-space: nowrap;
 }
 .simulation-card {
   display: grid;

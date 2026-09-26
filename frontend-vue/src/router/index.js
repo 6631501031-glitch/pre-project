@@ -17,6 +17,7 @@ const GraduateCeremonyPreferences = () => import('@/projects/views/graduation/Gr
 const GraduateRegistrationAdmin = () => import('@/projects/views/graduation/GraduateRegistrationAdmin')
 const GraduateCheckInDashboard = () => import('@/projects/views/graduation/GraduateCheckInDashboard')
 const GraduateFaceCheckIn = () => import('@/projects/views/graduation/GraduateFaceCheckIn')
+const GraduateAutoCheckIn = () => import('@/projects/views/graduation/GraduateAutoCheckIn')
 const AccountDirectory = () => import('@/projects/views/accounts/Management')
 const BusinessOperations = () => import('@/projects/views/operations/BusinessOperations')
 const CreateMenu = () => import('@/projects/views/security/CreateMenu')
@@ -36,6 +37,7 @@ const SettingMessageStatus = () => import('@/projects/views/setting/Status')
 Vue.use(Router)
 
 const DEFAULT_LANDING_PATH = '/graduation/questionnaire/form'
+const ADMIN_LANDING_PATH = '/graduation/registrations'
 
 const router = new Router({
   hash: false,
@@ -45,7 +47,7 @@ const router = new Router({
   routes: [
     {
       path: '/',
-      redirect: DEFAULT_LANDING_PATH,
+      redirect: '/pages/login',
       name: 'Home',
       component: TheContainer,
       children: [
@@ -88,6 +90,12 @@ const router = new Router({
           path: 'graduation/face-checkin',
           name: 'Graduate Face Check-in',
           component: GraduateFaceCheckIn
+        },
+        {
+          path: 'graduation/admin-face-scanner',
+          name: 'Graduate Admin Face Scanner',
+          meta: { adminOnly: true },
+          component: GraduateAutoCheckIn
         },
         {
           path: 'operations/business',
@@ -308,6 +316,12 @@ function shouldRedirectDeniedDefault(path) {
   return normalizePermissionPath(path) === normalizePermissionPath(DEFAULT_LANDING_PATH)
 }
 
+function profileEmail(profile) {
+  const source = profile && typeof profile === 'object' ? profile : {}
+  const userinfo = source.userinfo && typeof source.userinfo === 'object' ? source.userinfo : {}
+  return String(source.email || userinfo.email || source.username || '').trim().toLowerCase()
+}
+
 router.beforeEach(async (to, from, next) => {
   try {
     await store.dispatch('auth/bootstrapSession')
@@ -321,14 +335,14 @@ router.beforeEach(async (to, from, next) => {
   const isAuthenticated = !!authState.isAuthen
   const profile = store.getters['auth/profile'] || {}
   const isStudentLogin = !!String(profile.studentCode || profile.barcodeValue || '').replace(/\D/g, '')
+  const isLamduanAdmin = /^\d+@lamduan\.mfu\.ac\.th$/.test(profileEmail(profile))
 
   if (!isPublicPage && (!hasToken || !isAuthenticated)) {
     return next({ path: '/pages/login' })
   }
 
-  if (to.path === '/pages/login' && hasToken && isAuthenticated) {
-    await ensurePermissionLoaded()
-    return next({ path: resolveLandingPath() })
+  if (to.path === '/dashboard') {
+    return next({ path: isStudentLogin ? '/graduation/register' : ADMIN_LANDING_PATH })
   }
 
   if (to.meta && to.meta.adminOnly && isStudentLogin) {
@@ -365,7 +379,7 @@ router.beforeEach(async (to, from, next) => {
   }
 
   const permissionMeta = to.meta && to.meta.permission
-  if (permissionMeta && hasToken && isAuthenticated) {
+  if (permissionMeta && hasToken && isAuthenticated && !isLamduanAdmin) {
     await ensurePermissionLoaded()
     const action = permissionMeta.action || 'view'
     const pathCandidates = buildPermissionCandidates(to, permissionMeta)

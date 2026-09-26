@@ -67,6 +67,7 @@ import {mapGetters} from "vuex";
 import api from "@/service/api";
 
 function pickLangValue(items, lang) {
+  if (typeof items === 'string') return items.trim()
   if (!Array.isArray(items)) return ''
   const preferred = items.find(item => item && item.key === lang && item.value)
   const english = items.find(item => item && item.key === 'en' && item.value)
@@ -151,6 +152,8 @@ export default {
       defaultAvatar: require('@/assets/avatars/1.jpg'),
       showProfileDialog: false,
       scannedFacePhoto: '',
+      registeredFirstName: '',
+      registeredLastName: '',
       avatarFailed: false
     }
   },
@@ -172,9 +175,13 @@ export default {
         const response = await api.graduateRegistrations('defaults')
         const registration = response && response.data ? response.data.data : null
         this.scannedFacePhoto = String((registration && registration.facePhoto) || '').trim()
+        this.registeredFirstName = pickLangValue(registration && registration.firstName, 'en')
+        this.registeredLastName = pickLangValue(registration && registration.lastName, 'en')
         this.avatarFailed = false
       } catch (error) {
         this.scannedFacePhoto = ''
+        this.registeredFirstName = ''
+        this.registeredLastName = ''
       }
     },
     onProfileImageError() {
@@ -221,10 +228,16 @@ export default {
     },
     displayName() {
       const userinfo = this.userinfo
-      const firstName = pickLangValue(userinfo.firstName, this.lang)
-      const lastName = pickLangValue(userinfo.lastName, this.lang)
-      const fullName = [firstName, lastName].filter(Boolean).join(' ').trim()
-      return fullName || this.copy.accountFallback
+      const profileName = pickLangValue(userinfo.firstName, 'en') || pickLangValue(this.account.firstName, 'en')
+      const firstName = profileName && !/GRADUATION\s*SYSTEM|FACE\s*RECOGNITION/i.test(profileName)
+        ? profileName : this.registeredFirstName
+      const email = String(this.account.email || '').trim().toLowerCase()
+      const isStudentLogin = !!String(this.account.studentCode || this.account.barcodeValue || '').replace(/\D/g, '')
+      const isAdmin = !isStudentLogin && (/^\d+@lamduan\.mfu\.ac\.th$/.test(email) || /ADMIN$/i.test(this.account.code || ''))
+      const lastName = pickLangValue(userinfo.lastName, 'en') || pickLangValue(this.account.lastName, 'en') || this.registeredLastName
+      const fullName = [firstName, lastName].filter(Boolean).join(' ')
+      if (!fullName) return isAdmin ? 'admin' : this.copy.accountFallback
+      return isAdmin ? (firstName ? `${firstName}-admin` : 'admin') : fullName
     },
     organizationPath() {
       const fromLifecycle = compactList(this.primaryAffiliation.orgPath)

@@ -351,20 +351,24 @@ function applyAccountIdentity(payload, request) {
   if (identity.accountId) payload.accountId = identity.accountId;
   if (identity.firstName && !payload.firstName) payload.firstName = identity.firstName;
   if (identity.lastName && !payload.lastName) payload.lastName = identity.lastName;
-  if (identity.email) payload.email = identity.email;
+  if (identity.email && !payload.email) payload.email = identity.email;
   if (identity.studentCode) {
     payload.studentCode = identity.studentCode;
     payload.barcodeValue = identity.studentCode;
   }
-  if (identity.school) payload.school = identity.school;
-  if (identity.schoolEnglish) payload.schoolEnglish = identity.schoolEnglish;
-  if (identity.program) payload.program = identity.program;
-  if (identity.programEnglish) payload.programEnglish = identity.programEnglish;
+  if (identity.school && !payload.school) payload.school = identity.school;
+  if (identity.schoolEnglish && !payload.schoolEnglish) payload.schoolEnglish = identity.schoolEnglish;
+  if (identity.program && !payload.program) payload.program = identity.program;
+  if (identity.programEnglish && !payload.programEnglish) payload.programEnglish = identity.programEnglish;
   return payload;
 }
 
 function accountOwnershipFilter(id, request) {
   const filter = { _id: new mongoose.Types.ObjectId(id) };
+  const current = request && (request.authAccount || request.currentAccount || request.account || request.user) || {};
+  const userinfo = current && current.userinfo && typeof current.userinfo === 'object' ? current.userinfo : {};
+  const email = String(current.email || userinfo.email || current.username || '').trim().toLowerCase();
+  if ((request && request.authSession && request.authSession.source === 'local-admin') || /^\d+@lamduan\.mfu\.ac\.th$/.test(email)) return filter;
   const identity = accountIdentityDefaults(request || {});
   const ownership = [];
   if (identity.accountId) ownership.push({ accountId: identity.accountId });
@@ -484,6 +488,12 @@ function buildListQuery(query) {
   if (program && program !== 'all') filter.program = program;
   if (ceremonyStatus && ceremonyStatus !== 'all') filter.ceremonyStatus = { $in: ceremonyStatusFilterValues(ceremonyStatus) };
 
+  if (query.foodAllergy === true || query.foodAllergy === 'true') {
+    filter.$and = [{ $or: [
+      { hasFoodAllergy: 'yes' },
+      { foodAllergyNote: { $type: 'string', $regex: /\S/, $not: /^\s*-\s*$/ } }
+    ] }];
+  }
   return filter;
 }
 
@@ -493,18 +503,87 @@ exports.list = async function list(query) {
   const skip = (page - 1) * limit;
   const filter = buildListQuery(query || {});
 
-  const [rows, total] = await Promise.all([
-    GraduateRegistration.find(filter).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
-    GraduateRegistration.countDocuments(filter)
+  const includeSummary = query.includeSummary === true || query.includeSummary === 'true';
+  // Attendance changes updatedAt while the dashboard walks through pages.
+  // Use immutable IDs so a new scan cannot move a graduate between pages.
+  const sort = query.sortBy === 'attendance' ? { _id: 1 } : { updatedAt: -1 };
+  const [rows, total, statusCounts] = await Promise.all([
+    GraduateRegistration.find(filter, query.includePhotos === 'false' || query.includePhotos === false ? { facePhoto: 0 } : {}).sort(sort).skip(skip).limit(limit).lean(),
+    GraduateRegistration.countDocuments(filter),
+    includeSummary ? GraduateRegistration.aggregate([
+      { $group: {
+        _id: '$ceremonyStatus', count: { $sum: 1 },
+        foodAllergy: { $sum: { $cond: [{ $or: [
+          { $eq: ['$hasFoodAllergy', 'yes'] },
+          { $not: [{ $in: [{ $trim: { input: { $ifNull: ['$foodAllergyNote', ''] } } }, ['', '-']] }] }
+        ] }, 1, 0] } }
+      } }
+    ]) : Promise.resolve(null)
   ]);
 
   return {
+    ...(includeSummary ? { summary: statusCounts.reduce((summary, group) => {
+      const status = cleanCode(group._id);
+      summary.total += group.count;
+      summary.foodAllergy += group.foodAllergy || 0;
+      if (status && status !== '80') summary.responded += group.count;
+      return summary;
+    }, { total: 0, responded: 0, foodAllergy: 0 }) } : {}),
     rows: rows.map(serializeRegistration),
     total,
     page,
     limit,
     hasMore: skip + rows.length < total
   };
+};
+
+// Only reference photos and the identity needed by the staffed scanner leave the API.
+exports.faceGallery = async function faceGallery(query) {
+  const filter = { facePhoto: { $type: 'string', $ne: '' } };
+  if (query.after) {
+    if (!mongoose.Types.ObjectId.isValid(query.after)) {
+      const error = new Error('Invalid gallery cursor');
+      error.status = 400;
+      throw error;
+    }
+    filter._id = { $gt: query.after };
+  }
+  const rows = await GraduateRegistration.find(filter).select({
+    firstName: 1, lastName: 1, studentCode: 1, barcodeValue: 1,
+    school: 1, schoolEnglish: 1, program: 1, programEnglish: 1, facePhoto: 1, facePhotoCapturedAt: 1
+  }).sort({ _id: 1 }).limit(25).lean();
+  return { rows, nextCursor: rows.length === 25 ? String(rows[rows.length - 1]._id) : null };
+};
+
+// The authorized camera performs recognition locally. Never replace the enrollment
+// photo with a passing camera frame, which would corrupt future matching.
+exports.checkIn = async function checkIn(id, body, request) {
+  const mode = body.checkInMode;
+  if (!mongoose.Types.ObjectId.isValid(id) || !['rehearsal', 'ceremony'].includes(mode) ||
+      typeof body.distance !== 'number' || !Number.isFinite(body.distance) || body.distance < 0 || body.distance > 0.5) {
+    const error = new Error('Invalid face check-in result');
+    error.status = 400;
+    throw error;
+  }
+  const now = new Date();
+  const field = 'latestCheckIns.' + mode;
+  const filter = { _id: id, facePhoto: { $type: 'string', $ne: '' }, $or: [
+    { [field + '.capturedAt']: null },
+    { [field + '.capturedAt']: { $lt: new Date(now.getTime() - 60000) } }
+  ] };
+  const updated = await GraduateRegistration.findOneAndUpdate(filter, { $set: {
+    [field]: { capturedAt: now, source: 'face-api.js-0.22.2', detection: { model: 'face-recognition', faceCount: 1 } },
+    update: actorFromRequest(request || {})
+  } }, { new: true, runValidators: true, projection: { facePhoto: 0 } }).lean();
+  if (updated) return { _id: updated._id, latestCheckIns: updated.latestCheckIns, duplicate: false };
+  const existing = await GraduateRegistration.findById(id).select({ latestCheckIns: 1 }).lean();
+  if (existing && existing.latestCheckIns && existing.latestCheckIns[mode] &&
+      existing.latestCheckIns[mode].capturedAt && new Date(existing.latestCheckIns[mode].capturedAt).getTime() >= now.getTime() - 60000) {
+    return { _id: existing._id, latestCheckIns: existing.latestCheckIns, duplicate: true };
+  }
+  const error = new Error('Registered reference face not found');
+  error.status = 404;
+  throw error;
 };
 
 exports.options = async function options() {
@@ -648,7 +727,10 @@ exports.isOwnedByStudent = async function isOwnedByStudent(id, studentCode) {
   if (!normalizedStudentCode) return false;
   const registration = await GraduateRegistration.findOne({
     _id: new mongoose.Types.ObjectId(id),
-    barcodeValue: normalizedStudentCode
+    $or: [
+      { studentCode: normalizedStudentCode },
+      { barcodeValue: normalizedStudentCode }
+    ]
   }).select({ _id: 1 }).lean();
   return !!registration;
 };
@@ -748,17 +830,30 @@ exports.saveFacePhoto = async function saveFacePhoto(id, body, request) {
   }
 
   const detection = cleanFaceDetection(source.facePhotoDetection);
+  const checkInMode = ['rehearsal', 'ceremony'].includes(source.checkInMode)
+    ? source.checkInMode
+    : null;
+  const capturedAt = new Date();
+  const facePhotoSource = cleanText(source.facePhotoSource) || DEFAULT_FACE_PHOTO_SOURCE;
+  const fieldsToSet = {
+    facePhoto: facePhoto,
+    facePhotoCapturedAt: capturedAt,
+    facePhotoBytes: bytes,
+    facePhotoSource: facePhotoSource,
+    facePhotoDetection: detection,
+    update: actorFromRequest(request || {})
+  };
+  if (checkInMode) {
+    fieldsToSet['latestCheckIns.' + checkInMode] = {
+      capturedAt: capturedAt,
+      source: facePhotoSource,
+      detection: detection
+    };
+  }
   const updated = await GraduateRegistration.findOneAndUpdate(
     accountOwnershipFilter(id, request),
     {
-      $set: {
-        facePhoto: facePhoto,
-        facePhotoCapturedAt: new Date(),
-        facePhotoBytes: bytes,
-        facePhotoSource: cleanText(source.facePhotoSource) || DEFAULT_FACE_PHOTO_SOURCE,
-        facePhotoDetection: detection,
-        update: actorFromRequest(request || {})
-      }
+      $set: fieldsToSet
     },
     { new: true, runValidators: true, projection: { facePhoto: 0 } }
   ).lean();
@@ -776,11 +871,12 @@ exports.saveFacePhoto = async function saveFacePhoto(id, body, request) {
     facePhotoCapturedAt: updated.facePhotoCapturedAt,
     facePhotoBytes: updated.facePhotoBytes,
     facePhotoSource: updated.facePhotoSource,
-    facePhotoDetection: updated.facePhotoDetection || detection
+    facePhotoDetection: updated.facePhotoDetection || detection,
+    latestCheckIns: updated.latestCheckIns || null
   };
 };
 
-exports.updateAdminStatus = async function updateAdminStatus(id, body, request) {
+exports.updateAdminStatus = async function updateAdminStatus(id, body, request, editRegistration = false) {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     const error = new Error('Invalid graduate registration id');
     error.status = 400;
@@ -800,6 +896,29 @@ exports.updateAdminStatus = async function updateAdminStatus(id, body, request) 
     ceremonyAssistanceType: ceremonyStatus === '20' ? cleanCode(body && body.ceremonyAssistanceType) : null,
     update: actorFromRequest(request || {})
   };
+
+  if (Object.prototype.hasOwnProperty.call(body, 'ceremonyStatusNote')) {
+    const preferences = payloadFromBody(body);
+    validatePayload(preferences);
+    if (ceremonyStatus === '20' && !['21', '22', '23', '24'].includes(preferences.ceremonyAssistanceType)) {
+      const error = new Error('ceremonyAssistanceType is required');
+      error.status = 400;
+      throw error;
+    }
+    ['ceremonyStatusNote', 'certificateDeliveryMethod', 'certificateShippingService',
+      'certificateDeliveryAddress', 'hasFoodAllergy', 'foodAllergyNote'].forEach(function (field) {
+      payload[field] = preferences[field];
+    });
+  }
+
+  if (editRegistration) {
+    const fields = ['firstName', 'lastName', 'phone', 'email', 'school', 'schoolEnglish', 'program', 'programEnglish'];
+    const preferences = payloadFromBody(body);
+    fields.forEach(function (field) {
+      if (Object.prototype.hasOwnProperty.call(body, field)) payload[field] = preferences[field];
+    });
+
+  }
 
   if (!requiresCertificateDeliveryStatus(ceremonyStatus)) {
     payload.certificateDeliveryMethod = null;

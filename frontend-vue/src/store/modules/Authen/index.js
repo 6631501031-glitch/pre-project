@@ -9,6 +9,7 @@ import { resolveFirstAccessiblePath } from '@/projects/utils/permission-landing'
 
 const X_ACCESS_TOKEN_STORAGE_KEY = 'x-access-token';
 const POST_SIGNIN_ROUTE = '/graduation/questionnaire/form';
+const ADMIN_POST_SIGNIN_ROUTE = '/graduation/registrations';
 const APP_AUTH_SYSTEM = process.env.VUE_APP_AUTH_SYSTEM || process.env.VUE_APP_PROJECT_APP_ID || 'graduationsystemusingfacerecognition';
 
 function normalizeStudentCode(value) {
@@ -306,7 +307,7 @@ const ServerModule = {
                     commit('is2FA', false);
                     commit('pendingToken', '');
                     commit('pendingStudentCode', '');
-                    await pushPostSignInRoute();
+                    await pushPostSignInRoute(studentCode ? POST_SIGNIN_ROUTE : ADMIN_POST_SIGNIN_ROUTE);
                     return;
                 }
 

@@ -38,6 +38,12 @@ const faceDetectionSchema = new Schema({
   height: { type: Number, default: null }
 }, { _id: false });
 
+const checkInSchema = new Schema({
+  capturedAt: { type: Date, default: null },
+  source: { type: String, trim: true, default: null },
+  detection: { type: faceDetectionSchema, default: null }
+}, { _id: false });
+
 const graduateRegistrationSchema = new Schema({
   accountId: { type: Schema.ObjectId, default: null, index: true },
   firstName: { type: String, trim: true, default: null, index: true },
@@ -74,6 +80,10 @@ const graduateRegistrationSchema = new Schema({
   facePhotoBytes: { type: Number, default: null },
   facePhotoSource: { type: String, trim: true, default: null },
   facePhotoDetection: { type: faceDetectionSchema, default: null },
+  latestCheckIns: {
+    rehearsal: { type: checkInSchema, default: null },
+    ceremony: { type: checkInSchema, default: null }
+  },
   create: { type: auditSchema, default: () => ({}) },
   update: { type: auditSchema, default: null }
 }, {

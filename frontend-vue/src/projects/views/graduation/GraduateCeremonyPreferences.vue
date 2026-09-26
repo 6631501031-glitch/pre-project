@@ -1,6 +1,6 @@
 <template>
   <div class="ceremony-page">
-    <div class="ceremony-header">
+    <div v-if="!adminMode" class="ceremony-header">
       <div class="ceremony-header__step">{{ stepLabel }}</div>
       <h1>{{ pageTitle }}</h1>
     </div>
@@ -12,11 +12,19 @@
           {{ isEnglish ? 'Loading information...' : 'กำลังโหลดข้อมูล...' }}
         </div>
         <template v-else>
+          <template v-if="adminMode">
+            <h2>{{ isEnglish ? 'Personal and academic information' : 'ข้อมูลส่วนตัวและการศึกษา' }}</h2>
+            <CRow>
+              <CCol v-for="field in visibleAdminFields" :key="field.key" md="6">
+                <CInput v-model.trim="form[field.key]" :label="isEnglish ? field.en : field.th" :readonly="!['firstName', 'lastName', 'phone', 'email', 'school', 'schoolEnglish', 'program', 'programEnglish'].includes(field.key)" />
+              </CCol>
+            </CRow>
+          </template>
           <div class="section-heading">
             <h2>{{ $t('graduation.fields.ceremonyStatus') }}<span class="required-mark">*</span></h2>
           </div>
           <CSelect
-            v-model="form.ceremonyStatus"
+            :value.sync="form.ceremonyStatus"
             :label="isEnglish ? 'Select status' : 'เลือกสถานะ'"
             :options="ceremonyStatusOptions"
             :class="{ 'is-invalid': errorFor('ceremonyStatus') }"
@@ -27,7 +35,7 @@
 
           <CSelect
             v-if="requiresAssistanceType"
-            v-model="form.ceremonyAssistanceType"
+            :value.sync="form.ceremonyAssistanceType"
             :label="$t('graduation.fields.assistanceType')"
             :options="assistanceOptions"
             :class="{ 'is-invalid': errorFor('ceremonyAssistanceType') }"
@@ -44,7 +52,7 @@
           <div v-if="requiresCertificateDelivery" class="certificate-block">
             <h3>{{ $t('graduation.certificate.title') }}</h3>
             <CSelect
-              v-model="form.certificateDeliveryMethod"
+              :value.sync="form.certificateDeliveryMethod"
               :label="$t('graduation.certificate.method')"
               :options="certificateMethodOptions"
               :class="{ 'is-invalid': errorFor('certificateDeliveryMethod') }"
@@ -136,7 +144,7 @@
 
           <div class="allergy-block">
             <CSelect
-              v-model="form.hasFoodAllergy"
+              :value.sync="form.hasFoodAllergy"
               :label="$t('graduation.fields.foodAllergy')"
               :options="yesNoOptions"
               @input="onFoodAllergyChange"
@@ -193,11 +201,27 @@ const emptyForm = () => ({
 
 export default {
   name: 'GraduateCeremonyPreferences',
+  props: {
+    adminMode: { type: Boolean, default: false },
+    registrationData: { type: Object, default: null }
+  },
   data () {
     return {
+      adminFields: [
+        { key: 'firstName', th: 'ชื่อ', en: 'First name' },
+        { key: 'lastName', th: 'นามสกุล', en: 'Last name' },
+        { key: 'firstNamePronunciation', th: 'สะกดชื่อ', en: 'First name pronunciation' },
+        { key: 'lastNamePronunciation', th: 'สะกดนามสกุล', en: 'Last name pronunciation' },
+        { key: 'phone', th: 'เบอร์โทรศัพท์', en: 'Phone' },
+        { key: 'email', th: 'อีเมล', en: 'Email' },
+        { key: 'school', th: 'สำนักวิชา', en: 'School (Thai)' },
+        { key: 'schoolEnglish', th: 'สำนักวิชา (ภาษาอังกฤษ)', en: 'School (English)' },
+        { key: 'program', th: 'สาขา/หลักสูตร', en: 'Program (Thai)' },
+        { key: 'programEnglish', th: 'สาขา/หลักสูตร (ภาษาอังกฤษ)', en: 'Program (English)' }
+      ],
       registration: null,
       form: emptyForm(),
-      loading: false,
+      loading: true,
       saving: false,
       validationAttempted: false,
       certificateAddressSource: '',
@@ -214,6 +238,14 @@ export default {
     }
   },
   computed: {
+    visibleAdminFields () {
+      return this.adminFields
+        .filter(field => !['schoolEnglish', 'programEnglish'].includes(field.key))
+        .map(field => {
+          if (!['school', 'program'].includes(field.key)) return field
+          return { ...field, key: this.isEnglish ? field.key + 'English' : field.key, en: field.key === 'school' ? 'School' : 'Program' }
+        })
+    },
     currentProfile () {
       return this.$store && this.$store.getters ? this.$store.getters['auth/profile'] : null
     },
@@ -301,7 +333,7 @@ export default {
       ]
     },
     requiresAssistanceType () { return this.form.ceremonyStatus === '20' },
-    showsExtraDetail () { return this.form.ceremonyStatus === '70' || ['21', '22', '23', '24'].includes(this.form.ceremonyAssistanceType) },
+    showsExtraDetail () { return this.form.ceremonyStatus === '70' || (this.requiresAssistanceType && ['21', '22', '23', '24'].includes(this.form.ceremonyAssistanceType)) },
     requiresCertificateDelivery () { return ['50', '60'].includes(this.form.ceremonyStatus) },
     requiresShipping () { return this.requiresCertificateDelivery && this.form.certificateDeliveryMethod === 'postal' },
     isFormComplete () {
@@ -374,7 +406,7 @@ export default {
     },
     onCeremonyStatusChange (value) {
       this.form.ceremonyStatus = this.normalizeCode(value)
-      updateGraduationProgress(this.currentProfile, {
+      if (!this.adminMode) updateGraduationProgress(this.currentProfile, {
         ceremonySaved: false,
         ceremonyStatus: this.form.ceremonyStatus
       })
@@ -398,7 +430,9 @@ export default {
     async load () {
       this.loading = true
       try {
-        const response = await api.graduateRegistrations('defaults')
+        const response = this.adminMode
+          ? { data: { data: this.registrationData } }
+          : await api.graduateRegistrations('defaults')
         const row = response && response.data ? response.data.data : null
         this.registration = row || null
         this.certificateAddressSource = ''
@@ -412,7 +446,13 @@ export default {
           hasFoodAllergy: row && row.hasFoodAllergy === 'yes' ? 'yes' : 'no',
           foodAllergyNote: this.meaningfulText(row && row.foodAllergyNote)
         })
-        updateGraduationProgress(this.currentProfile, {
+        if (this.adminMode) {
+          const profile = {}
+          this.adminFields.forEach(field => { profile[field.key] = this.meaningfulText(row && row[field.key]) })
+          this.form = Object.assign({}, this.form, profile)
+        }
+        if (this.hasAddressValue(this.form.certificateDeliveryAddress)) this.certificateAddressSource = 'custom'
+        if (!this.adminMode) updateGraduationProgress(this.currentProfile, {
           ceremonySaved: !!this.form.ceremonyStatus,
           ceremonyStatus: this.form.ceremonyStatus
         })
@@ -427,6 +467,17 @@ export default {
       if (Object.keys(this.errors).length) return
       this.saving = true
       try {
+        if (this.adminMode) {
+          const payload = { _id: this.registration._id }
+          // Display other identity fields without submitting changes to them.
+          for (const field of [...Object.keys(emptyForm()), 'firstName', 'lastName', 'phone', 'email', 'school', 'schoolEnglish', 'program', 'programEnglish']) {
+            payload[field] = this.form[field]
+          }
+          const response = await api.graduateRegistrations('update-admin-details', payload)
+          this.$emit('saved', response.data.data)
+          notifySuccess(this.$store, this.isEnglish ? 'Information saved.' : '\u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e49\u0e27')
+          return
+        }
         const payload = Object.assign({}, this.registration || {}, this.form)
         const id = this.registration && (this.registration._id || this.registration.id)
         const response = id
@@ -439,7 +490,7 @@ export default {
         const progress = getGraduationProgress(this.currentProfile)
         if (isFaceRegistrationEnabled(progress)) {
           this.$router.push('/graduation/face-checkin')
-        } else if (['50', '60', '70'].includes(this.form.ceremonyStatus)) {
+        } else if (this.form.ceremonyStatus === '70') {
           this.$router.push('/graduation/register')
         }
       } catch (error) {
