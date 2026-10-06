@@ -36,9 +36,15 @@ module.exports = {
     }
   },
   devServer: {
-    disableHostCheck: true,
-    historyApiFallback: true
-  },
+  disableHostCheck: true,
+  historyApiFallback: true,
+  proxy: {
+    '/api': {
+      target: 'http://127.0.0.1:8206',
+      changeOrigin: true
+    }
+  }
+},
   configureWebpack: {
     //Necessary to run npm link https://webpack.js.org/configuration/resolve/#resolve-symlinks
     resolve: {

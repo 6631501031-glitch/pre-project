@@ -68,6 +68,13 @@ export default {
       const profile = this.$store.getters['auth/profile'] || {}
       return !!String(profile.studentCode || profile.barcodeValue || '').replace(/\D/g, '')
     },
+    isAdminConsoleUser() {
+      const profile = this.currentProfile || {}
+      const email = String(profile.email || (profile.userinfo && profile.userinfo.email) || '').toLowerCase()
+      const identity = String(profile.username || profile.name || profile.displayName || '').toLowerCase()
+      const roles = Array.isArray(profile.roles) ? profile.roles.map(role => String(role).toLowerCase()) : []
+      return /admin/.test(email) || /admin/.test(identity) || roles.some(role => /admin|staff|manager/.test(role))
+    },
     navs() {
       this.$i18n.locale
       const navConfig = buildNav(this.$t.bind(this))

@@ -149,7 +149,7 @@ export default {
 
   data () {
     return {
-      defaultAvatar: require('@/assets/avatars/1.jpg'),
+      defaultAvatar: require('@/assets/avatars/account-placeholder.svg'),
       showProfileDialog: false,
       scannedFacePhoto: '',
       registeredFirstName: '',
@@ -307,7 +307,7 @@ export default {
     },
     avatarSrc() {
       if (this.avatarFailed) return this.defaultAvatar
-      return this.scannedFacePhoto ||
+      return this.profileImageSrc || this.scannedFacePhoto ||
         this.defaultAvatar
     }
   },

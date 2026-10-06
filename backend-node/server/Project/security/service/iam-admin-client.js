@@ -1303,6 +1303,64 @@ async function forwardAccountsList(request, response) {
   }
 }
 
+async function forwardActiveAdminSessions(request, response) {
+  try {
+    const headers = { lang: request.headers && request.headers.lang ? request.headers.lang : 'th' };
+    const [scopedMetadata, assignments] = await Promise.all([
+      resolveScopedSecurityMetadata(headers),
+      fetchActiveSecurityAssignments(headers)
+    ]);
+    const allowedGroupIds = scopedMetadata.allowedGroupIds || new Set();
+    const adminGroupIds = new Set(Array.from(allowedGroupIds).filter(function (groupId) {
+      const group = scopedMetadata.allowedGroupsById && scopedMetadata.allowedGroupsById.get(groupId);
+      return /admin|ผู้ดูแล/i.test(getRefTitle(group));
+    }));
+    const accountIds = Array.from(new Set((assignments || []).filter(function (assignment) {
+      const groupId = getAssignmentGroupId(assignment);
+      return groupId && adminGroupIds.has(groupId);
+    }).map(getAssignmentAccountId).filter(Boolean)));
+
+    if (!accountIds.length) {
+      return response.status(200).json({ status: true, data: { admins: [] } });
+    }
+
+    const accountResult = await fetchAccountsList(headers, { accountIds: accountIds.join(',') });
+    const accounts = Array.isArray(accountResult && accountResult.data) ? accountResult.data : [];
+    const activeAdmins = await Promise.all(accounts.map(async function (account) {
+      const accountId = account && account._id ? String(account._id) : '';
+      const email = String(account && (account.email || (account.userinfo && account.userinfo.email)) || '').trim();
+      if (!accountId || !email) return null;
+      try {
+        const sessionResult = await requestUser(createUserRequestOptions(request, {
+          method: 'get',
+          path: `/accounts/${encodeURIComponent(accountId)}/sessions`
+        }));
+        const payload = sessionResult && sessionResult.payload ? sessionResult.payload : {};
+        const data = payload.data && typeof payload.data === 'object' ? payload.data : payload;
+        const nowSeconds = Math.floor(Date.now() / 1000);
+        const sessions = (Array.isArray(data.sessions) ? data.sessions : []).filter(function (session) {
+          const expiry = Number(session && session.expired_key || 0);
+          return !expiry || expiry >= nowSeconds;
+        });
+        if (!sessions.length) return null;
+        const latest = sessions.map(function (session) {
+          return session && session.dateTime ? new Date(session.dateTime).getTime() : 0;
+        }).sort(function (left, right) { return right - left; })[0] || null;
+        return { id: accountId, email: email, active: true, sessionCount: sessions.length, lastSeen: latest ? new Date(latest).toISOString() : null };
+      } catch (error) {
+        return null;
+      }
+    }));
+    return response.status(200).json({
+      status: true,
+      data: { admins: activeAdmins.filter(Boolean) }
+    });
+  } catch (err) {
+    const normalized = normalizeError(err, 'iam_active_admin_sessions_failed');
+    return response.status(normalized.statusCode).json(normalized.payload);
+  }
+}
+
 async function isAccountInCurrentScope(accountId, headers) {
   const normalizedAccountId = String(accountId || '').trim();
   if (!normalizedAccountId) return false;
@@ -1813,6 +1871,7 @@ module.exports = {
   resolveCurrentAccount,
   forwardMyPermissions,
   forwardAccountsList,
+  forwardActiveAdminSessions,
   requireScopedAccount,
   removeAccountFromScope,
   forwardRemoveAccountFromScope,
