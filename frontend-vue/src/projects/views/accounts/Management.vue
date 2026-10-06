@@ -1,225 +1,93 @@
 <template>
-  <div class="account-page">
+  <div class="admin-email-page">
     <AppSectionHero
-      :title="$t('accounts.directory.title')"
-      :subtitle="$t('accounts.directory.subtitle')"
-      :stats="heroStats"
-      :meta-label="$t('common.lastUpdated')"
-      :meta-value="lastUpdatedLabel"
+      :title="$t('accounts.directory.adminPresence.title')"
+      :refresh-label="$t('accounts.directory.adminPresence.refresh')"
       @refresh="loadData"
     />
 
-    <AccountDirectoryTable
-      :items="items"
-      :pagination="pagination"
-      :loading="loading"
-      @invite="openInviteModal"
-      @edit="openEditModal"
-      @access="openPermissionsModal"
-      @remove-graduationsystemusingfacerecognition-access="removeGRADUATIONSYSTEMUSINGFACERECOGNITIONGRADUATIONSYSTEMUSINGFACERECOGNITIONAccess"
-      @page-change="loadPage"
-      @search-change="searchAccounts"
-      @limit-change="changeLimit"
-    />
+    <CCard class="admin-email-card">
+      <CCardBody>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h4 class="mb-0">{{ $t('accounts.directory.adminPresence.listTitle') }}</h4>
+          <CBadge color="success" shape="pill">
+            {{ $t('accounts.directory.adminPresence.onlineCount', { count: adminEmails.length }) }}
+          </CBadge>
+        </div>
 
-    <InviteAccountModal
-      :show.sync="showInviteModal"
-      :group-options="groupOptions"
-      @submit="submitInvite"
-      @cancel="closeInviteModal"
-    />
+        <div v-if="loadError" class="alert alert-warning">
+          {{ $t('accounts.directory.adminPresence.loadError') }}
+        </div>
 
-    <EditAccountModal
-      :show.sync="showEditModal"
-      :value="selectedAccount"
-      :status-options="statusOptions"
-      :group-options="groupOptions"
-      @submit="submitAccountUpdate"
-      @cancel="closeEditModal"
-    />
-
-    <AccountPermissionsModal
-      :show.sync="showPermissionsModal"
-      :account="selectedAccount"
-      :groups="accessGroups"
-      :permissions="accessPermissions"
-      :sessions="accountSessions"
-      :trusted-devices="trustedDevices"
-      @revoke-session="revokeSession"
-      @revoke-trusted-device="revokeTrustedDevice"
-      @close="closePermissionsModal"
-    />
+        <div v-if="adminEmails.length">
+          <div v-for="admin in adminEmails" :key="admin.id || admin.email" class="admin-email-row">
+            <div class="admin-email-avatar">{{ admin.initial }}</div>
+            <div class="flex-grow-1 font-weight-bold">{{ admin.email }}</div>
+            <CBadge color="success">{{ $t('accounts.directory.adminPresence.active') }}</CBadge>
+          </div>
+        </div>
+        <div v-else class="empty-state">
+          {{ $t('accounts.directory.adminPresence.empty') }}
+        </div>
+      </CCardBody>
+    </CCard>
   </div>
 </template>
 
 <script>
 import { mapGetters } from 'vuex'
 import AppSectionHero from '@/projects/components/layout/AppSectionHero'
-import AccountDirectoryTable from './components/AccountDirectoryTable'
-import InviteAccountModal from './InviteAccountModal'
-import EditAccountModal from './EditAccountModal'
-import AccountPermissionsModal from './AccountPermissionsModal'
-import { notifyError, notifyInfo, notifySuccess } from '@/projects/utils/notify'
+import Service from '@/service/api'
 
 export default {
   name: 'AccountManagement',
-  components: { AppSectionHero, AccountDirectoryTable, InviteAccountModal, EditAccountModal, AccountPermissionsModal },
+  components: { AppSectionHero },
   data () {
-    return {
-      showEditModal: false,
-      showPermissionsModal: false,
-      showInviteModal: false,
-      selectedAccount: null
-    }
+    return { adminSessions: [], loadError: false, refreshTimer: null }
   },
   computed: {
-    ...mapGetters({
-      items: 'accounts/items',
-      pagination: 'accounts/pagination',
-      loading: 'accounts/loading',
-      lastUpdatedLabel: 'accounts/lastUpdatedLabel',
-      statusOptions: 'accounts/statusOptions',
-      groupOptions: 'accounts/groupOptions',
-      accessGroups: 'accounts/accessGroups',
-      accessPermissions: 'accounts/accessPermissions',
-      accountSessions: 'accounts/accountSessions',
-      trustedDevices: 'accounts/trustedDevices'
-    }),
-    activeCount () {
-      return this.items.filter(item => item && item.statusKey === 'ACTIVE').length
-    },
-    attentionCount () {
-      return this.items.filter(item => item && ['LOCKED', 'SUSPENDED', 'PENDING'].includes(item.statusKey)).length
-    },
-    heroStats () {
-      return [
-        { label: this.$t('accounts.directory.stats.total.label'), value: this.pagination.total || this.items.length, hint: this.$t('accounts.directory.stats.total.hint'), icon: 'cil-people', iconClass: 'app-section-stat__icon--total' },
-        { label: this.$t('accounts.directory.stats.active.label'), value: this.activeCount, hint: this.$t('accounts.directory.stats.active.hint'), icon: 'cil-check-circle', iconClass: 'app-section-stat__icon--active' },
-        { label: this.$t('accounts.directory.stats.attention.label'), value: this.attentionCount, hint: this.$t('accounts.directory.stats.attention.hint'), icon: 'cil-warning', iconClass: 'app-section-stat__icon--attention' }
-      ]
+    ...mapGetters({ profile: 'auth/profile' }),
+    adminEmails () {
+      const admins = (this.adminSessions || []).filter(item => item && item.email).map(item => ({
+        id: item.id || item.email,
+        email: item.email,
+        initial: item.email.charAt(0).toUpperCase()
+      }))
+      const profile = this.profile || {}
+      const currentEmail = String(profile.email || (profile.userinfo && profile.userinfo.email) || '').trim()
+      if (currentEmail && !admins.some(item => item.email.toLowerCase() === currentEmail.toLowerCase())) {
+        admins.unshift({ id: 'current-session', email: currentEmail, initial: currentEmail.charAt(0).toUpperCase() })
+      }
+      return admins
     }
   },
   created () {
     this.loadData()
+    this.refreshTimer = setInterval(this.loadData, 15000)
+  },
+  beforeDestroy () {
+    if (this.refreshTimer) clearInterval(this.refreshTimer)
   },
   methods: {
-    async loadData (options = {}) {
+    async loadData () {
       try {
-        await this.$store.dispatch('accounts/explorer', {
-          page: options.page || this.pagination.page || 1,
-          limit: options.limit || this.pagination.limit || 25,
-          search: options.search != null ? options.search : this.pagination.search || ''
-        })
+        const response = await Service.accounts('admin-active-sessions')
+        const data = response && response.data && response.data.data ? response.data.data : {}
+        this.adminSessions = Array.isArray(data.admins) ? data.admins : []
+        this.loadError = false
       } catch (error) {
-        notifyError(this.$store, this.$t('accounts.directory.messages.loadError'))
+        this.loadError = true
       }
-    },
-    loadPage (page) {
-      return this.loadData({ page })
-    },
-    searchAccounts (search) {
-      return this.loadData({ page: 1, search })
-    },
-    changeLimit (limit) {
-      return this.loadData({ page: 1, limit })
-    },
-    openEditModal (item) {
-      if (!(item && item._id)) return
-      this.selectedAccount = item
-      this.showEditModal = true
-    },
-    openInviteModal () {
-      this.showInviteModal = true
-    },
-    closeInviteModal () {
-      this.showInviteModal = false
-    },
-    async submitInvite (payload) {
-      try {
-        await this.$store.dispatch('accounts/invite', payload)
-        notifySuccess(this.$store, this.$t('accounts.directory.messages.inviteSuccess'))
-        this.closeInviteModal()
-      } catch (error) {
-        notifyError(this.$store, this.$t('accounts.directory.messages.inviteError'))
-      }
-    },
-    async openPermissionsModal (item) {
-      if (!(item && item._id)) return
-      try {
-        await this.$store.dispatch('accounts/fetchAccessReview', item._id)
-        this.selectedAccount = item
-        this.showPermissionsModal = true
-        await Promise.all([
-          this.$store.dispatch('accounts/fetchSessions', item._id).catch(() => null),
-          this.$store.dispatch('accounts/fetchTrustedDevices', item._id).catch(() => null)
-        ])
-      } catch (error) {
-        notifyError(this.$store, this.$t('accounts.directory.messages.loadSecurityWorkspaceError'))
-      }
-    },
-    async submitAccountUpdate (payload) {
-      try {
-        await this.$store.dispatch('accounts/update', payload)
-        notifySuccess(this.$store, this.$t('accounts.directory.messages.updateSuccess'))
-        this.closeEditModal()
-      } catch (error) {
-        notifyError(this.$store, this.$t('accounts.directory.messages.updateError'))
-      }
-    },
-    async removeGRADUATIONSYSTEMUSINGFACERECOGNITIONGRADUATIONSYSTEMUSINGFACERECOGNITIONAccess (item) {
-      if (!(item && item._id)) return
-      try {
-        const accountLabel = item.email || item.fullName || 'this account'
-        const confirmed = await this.$store.dispatch('dialog/openConfirm', {
-          title: this.$t('accounts.directory.messages.removeConfirmTitle'),
-          message: this.$t('accounts.directory.messages.removeConfirmMessage', { account: accountLabel }),
-          confirmText: this.$t('accounts.directory.actions.remove'),
-          confirmIcon: 'cil-trash'
-        })
-        if (!confirmed) return
-        await this.$store.dispatch('accounts/removeGRADUATIONSYSTEMUSINGFACERECOGNITIONGRADUATIONSYSTEMUSINGFACERECOGNITIONAccess', item)
-        notifyInfo(this.$store, this.$t('accounts.directory.messages.removeSuccess'))
-      } catch (error) {
-        notifyError(this.$store, this.$t('accounts.directory.messages.removeError'))
-      }
-    },
-    async revokeSession (session) {
-      if (!(this.selectedAccount && this.selectedAccount._id && session && session._id)) return
-      try {
-        await this.$store.dispatch('accounts/revokeSession', {
-          id: this.selectedAccount._id,
-          sessionId: session._id
-        })
-        notifyInfo(this.$store, this.$t('accounts.directory.messages.revokeSessionSuccess'))
-      } catch (error) {
-        notifyError(this.$store, this.$t('accounts.directory.messages.revokeSessionError'))
-      }
-    },
-    async revokeTrustedDevice (device) {
-      if (!(this.selectedAccount && this.selectedAccount._id && device && device._id)) return
-      try {
-        await this.$store.dispatch('accounts/revokeTrustedDevice', {
-          id: this.selectedAccount._id,
-          trustedDeviceId: device._id
-        })
-        notifyInfo(this.$store, this.$t('accounts.directory.messages.revokeTrustedDeviceSuccess'))
-      } catch (error) {
-        notifyError(this.$store, this.$t('accounts.directory.messages.revokeTrustedDeviceError'))
-      }
-    },
-    closeEditModal () {
-      this.showEditModal = false
-      this.selectedAccount = null
-    },
-    closePermissionsModal () {
-      this.showPermissionsModal = false
-      this.selectedAccount = null
-      this.$store.commit('accounts/clearSecurityWorkspace')
     }
   }
 }
 </script>
 
-<style scoped lang="scss">
-.account-page {}
+<style scoped>
+.admin-email-page { max-width: 1180px; margin: 0 auto; }
+.admin-email-card { border-radius: 18px; }
+.admin-email-row { display: flex; align-items: center; gap: 14px; padding: 16px 4px; border-bottom: 1px solid #edf0f5; }
+.admin-email-row:last-child { border-bottom: 0; }
+.admin-email-avatar { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: #8c1515; font-weight: 700; }
+.empty-state { padding: 48px 16px; text-align: center; color: #344054; }
 </style>

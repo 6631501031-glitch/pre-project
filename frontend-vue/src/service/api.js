@@ -212,6 +212,8 @@ export default {
     switch (method) {
       case 'list':
         return instance.get('/api/v1/accounts', { params: data || {} });
+      case 'admin-active-sessions':
+        return instance.get('/api/v1/accounts/admin-active-sessions', { params: data || {} });
       case 'invite':
         return instance.post('/api/v1/accounts/invite', data || {});
       case 'update':
