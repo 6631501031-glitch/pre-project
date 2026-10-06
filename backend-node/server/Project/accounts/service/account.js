@@ -31,6 +31,7 @@ const {
     resolveTargetStatusKey,
     toObjectId
 } = require('./account-status');
+const { isAllowedAdminEmail } = require('../../../../helpers/admin-emails');
 
 const TRUST_DEVICE_DAYS = Number(process.env.TRUST_DEVICE_DAYS || 30);
 const FORCE_2FA = typeof (Config.security && Config.security.authRequire2FA) === 'boolean'
@@ -233,8 +234,11 @@ exports.verifyIdTokenGoogle = async function (request, response, next) {
                     message: error && error.message ? error.message : 'unknown_error',
                     audience: audience
                 });
-                var invalidToken = await resMsg.onMessage_Response(0,40100);
-                return response.status(401).json(invalidToken);
+                return response.status(401).json({
+                    status: false,
+                    code: 'AUTH_GOOGLE_TOKEN_INVALID',
+                    message: 'Unable to verify your email sign-in. Please sign in again.'
+                });
             }
         } else {
             return next();
@@ -325,12 +329,15 @@ exports.SingIn = async function (request, response, next) {
         }
 
         // Refresh existing bootstrap accounts from the verified Google identity too.
-        if (request.localVerifiedLamduanSignin && request.body.googleGivenName) {
-            const firstName = toLangArray(request.body.googleGivenName, 'en');
-            await Account.onUpdate({ _id: new mongo.ObjectId(isDoc._id) }, {
-                $set: { 'userinfo.firstName': firstName }
-            });
-            isDoc.userinfo = Object.assign({}, isDoc.userinfo || {}, { firstName });
+        if (request.localVerifiedLamduanSignin) {
+            const image = request.body.googlePicture || null;
+            const updates = { 'userinfo.image': image };
+            if (request.body.googleGivenName) {
+                updates['userinfo.firstName'] = toLangArray(request.body.googleGivenName, 'en');
+            }
+            await Account.onUpdate({ _id: new mongo.ObjectId(isDoc._id) }, { $set: updates });
+            isDoc.userinfo = Object.assign({}, isDoc.userinfo || {}, { image });
+            if (updates['userinfo.firstName']) isDoc.userinfo.firstName = updates['userinfo.firstName'];
         }
 
         await ensureBootstrapAccessForAccount(isDoc._id);
@@ -478,6 +485,44 @@ exports.onSessions = async function (request, response, next) {
     } catch (err) {
         var fail = await resMsg.onMessage_Response(0,50000);
         return response.status(500).json(fail);
+    }
+};
+
+exports.onAdminActiveSessions = async function (request, response) {
+    try {
+        const accounts = await Account.onQuerys(
+            { email: /@mfu\.ac\.th$/i },
+            [],
+            'email control.device'
+        );
+        const nowSeconds = moment().unix();
+        const admins = [];
+        (accounts || []).forEach(function (account) {
+            const email = String(account && account.email || '').trim().toLowerCase();
+            if (!isAllowedAdminEmail(email)) return;
+            const sessions = (account.control && Array.isArray(account.control.device) ? account.control.device : [])
+                .filter(function (session) {
+                    const expiry = Number(session && session.expired_key || 0);
+                    return !expiry || expiry >= nowSeconds;
+                });
+            if (!sessions.length) return;
+            const lastSeen = sessions.map(function (session) {
+                return session && session.dateTime ? new Date(session.dateTime).getTime() : 0;
+            }).sort(function (left, right) { return right - left; })[0] || null;
+            admins.push({
+                id: String(account._id),
+                email: email,
+                active: true,
+                sessionCount: sessions.length,
+                lastSeen: lastSeen ? new Date(lastSeen).toISOString() : null
+            });
+        });
+        const result = await resMsg.onMessage_Response(0, 20000);
+        result.data = { admins: admins };
+        return response.status(200).json(result);
+    } catch (error) {
+        const result = await resMsg.onMessage_Response(0, 50000);
+        return response.status(500).json(result);
     }
 };
 

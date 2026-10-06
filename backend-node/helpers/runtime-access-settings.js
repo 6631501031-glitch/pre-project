@@ -14,6 +14,7 @@ const DEFAULT_DEV_ORIGINS = [
     'http://localhost:18080',
     'http://127.0.0.1:18080'
 ];
+
 const CACHE_TTL_MS = 30 * 1000;
 
 let boundApp = null;
@@ -33,12 +34,17 @@ function isProduction() {
 function parseList(value) {
     if (Array.isArray(value)) {
         return value
-            .map(function (item) { return String(item == null ? '' : item).trim(); })
+            .map(function (item) {
+                return String(item == null ? '' : item).trim();
+            })
             .filter(Boolean);
     }
+
     return String(value || '')
         .split(/[\n,]/)
-        .map(function (item) { return item.trim(); })
+        .map(function (item) {
+            return item.trim();
+        })
         .filter(Boolean);
 }
 
@@ -48,9 +54,11 @@ function uniqueList(items) {
 
 function getBaseServerOrigin() {
     const value = String(process.env.BASE_SERVER_URL || '').trim();
+
     if (!value) {
         return '';
     }
+
     try {
         return new URL(value).origin;
     } catch (err) {
@@ -60,10 +68,14 @@ function getBaseServerOrigin() {
 
 function isLoopbackOrigin(origin) {
     if (!origin) return false;
+
     try {
         const parsed = new URL(String(origin));
         const hostname = String(parsed.hostname || '').toLowerCase();
-        return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+
+        return hostname === 'localhost' ||
+            hostname === '127.0.0.1' ||
+            hostname === '::1';
     } catch (err) {
         return false;
     }
@@ -71,9 +83,11 @@ function isLoopbackOrigin(origin) {
 
 function buildDefaultCorsOrigins() {
     const baseOrigin = getBaseServerOrigin();
+
     if (isProduction()) {
         return baseOrigin ? [baseOrigin] : [];
     }
+
     return uniqueList(
         baseOrigin
             ? DEFAULT_DEV_ORIGINS.concat([baseOrigin])
@@ -83,6 +97,7 @@ function buildDefaultCorsOrigins() {
 
 function envDefaults() {
     const baseCors = buildDefaultCorsOrigins();
+
     return {
         key: 'default',
         trustProxy: isProduction(),
@@ -106,6 +121,7 @@ function cloneConfig(config) {
 
 function resolveConfig(doc) {
     const fallback = envDefaults();
+
     if (!doc) {
         return fallback;
     }
@@ -113,17 +129,25 @@ function resolveConfig(doc) {
     const corsAllowedOrigins = Array.isArray(doc.corsAllowedOrigins)
         ? uniqueList(doc.corsAllowedOrigins)
         : fallback.corsAllowedOrigins.slice();
-    const socketCorsOrigins = Array.isArray(doc.socketCorsOrigins) && doc.socketCorsOrigins.length > 0
-        ? uniqueList(doc.socketCorsOrigins)
-        : corsAllowedOrigins.slice();
+
+    const socketCorsOrigins =
+        Array.isArray(doc.socketCorsOrigins) && doc.socketCorsOrigins.length > 0
+            ? uniqueList(doc.socketCorsOrigins)
+            : corsAllowedOrigins.slice();
 
     return {
         key: doc.key || 'default',
-        trustProxy: typeof doc.trustProxy === 'boolean' ? doc.trustProxy : fallback.trustProxy,
-        rateLimitEnabled: typeof doc.rateLimitEnabled === 'boolean' ? doc.rateLimitEnabled : fallback.rateLimitEnabled,
-        corsAllowedOrigins: corsAllowedOrigins,
-        socketCorsOrigins: socketCorsOrigins,
-        allowedIPs: Array.isArray(doc.allowedIPs) ? uniqueList(doc.allowedIPs) : fallback.allowedIPs.slice()
+        trustProxy: typeof doc.trustProxy === 'boolean'
+            ? doc.trustProxy
+            : fallback.trustProxy,
+        rateLimitEnabled: typeof doc.rateLimitEnabled === 'boolean'
+            ? doc.rateLimitEnabled
+            : fallback.rateLimitEnabled,
+        corsAllowedOrigins,
+        socketCorsOrigins,
+        allowedIPs: Array.isArray(doc.allowedIPs)
+            ? uniqueList(doc.allowedIPs)
+            : fallback.allowedIPs.slice()
     };
 }
 
@@ -132,25 +156,32 @@ function updateCache(doc, source) {
         loadedAt: Date.now(),
         loading: null,
         persisted: !!doc,
-        source: source,
+        source,
         doc: doc || null,
         config: cloneConfig(resolveConfig(doc))
     };
+
     applyExpressRuntime();
     return cache.config;
 }
 
 function applyExpressRuntime(app) {
     const target = app || boundApp;
+
     if (!target || typeof target.set !== 'function') {
         return;
     }
+
     const config = getResolvedConfig();
     target.set('trust proxy', !!config.trustProxy);
 }
 
 async function loadFromDatabase(force) {
-    if (!force && cache.config && (Date.now() - cache.loadedAt) < CACHE_TTL_MS) {
+    if (
+        !force &&
+        cache.config &&
+        (Date.now() - cache.loadedAt) < CACHE_TTL_MS
+    ) {
         return cache.config;
     }
 
@@ -162,13 +193,18 @@ async function loadFromDatabase(force) {
         if (!cache.config) {
             updateCache(null, 'environment');
         }
+
         return cache.config;
     }
 
     cache.loading = RuntimeAccess.ensureDefaultRecord()
         .then(function (result) {
             const doc = result && result.doc ? result.doc : null;
-            return updateCache(doc || null, doc ? 'database' : 'environment');
+
+            return updateCache(
+                doc || null,
+                doc ? 'database' : 'environment'
+            );
         })
         .catch(function () {
             return updateCache(null, 'environment');
@@ -182,7 +218,11 @@ function ensureFreshInBackground() {
         updateCache(null, 'environment');
         return;
     }
-    if ((Date.now() - cache.loadedAt) >= CACHE_TTL_MS && !cache.loading) {
+
+    if (
+        (Date.now() - cache.loadedAt) >= CACHE_TTL_MS &&
+        !cache.loading
+    ) {
         loadFromDatabase(false).catch(function () {});
     }
 }
@@ -193,7 +233,23 @@ function getResolvedConfig() {
     } else {
         ensureFreshInBackground();
     }
-    return cloneConfig(cache.config);
+
+    const config = cloneConfig(cache.config);
+
+    // เพิ่มโดเมนจาก environment รวมกับรายการเดิมในฐานข้อมูล
+    const extraOrigins = parseList(
+        process.env.EXTRA_ALLOWED_ORIGINS
+    );
+
+    config.corsAllowedOrigins = uniqueList(
+        config.corsAllowedOrigins.concat(extraOrigins)
+    );
+
+    config.socketCorsOrigins = uniqueList(
+        config.socketCorsOrigins.concat(extraOrigins)
+    );
+
+    return config;
 }
 
 function normalizeIp(ip) {
@@ -202,31 +258,40 @@ function normalizeIp(ip) {
 
 function isOriginAllowed(origin) {
     const config = getResolvedConfig();
+
     if (!origin) return true;
     if (!isProduction() && isLoopbackOrigin(origin)) return true;
+
     return config.corsAllowedOrigins.indexOf(String(origin)) !== -1;
 }
 
 function isSocketOriginAllowed(origin) {
     const config = getResolvedConfig();
+
     if (!origin) return true;
     if (!isProduction() && isLoopbackOrigin(origin)) return true;
+
     return config.socketCorsOrigins.indexOf(String(origin)) !== -1;
 }
 
 function isIpAllowed(ip) {
     const config = getResolvedConfig();
+
     if (!isProduction() || config.allowedIPs.length === 0) {
         return true;
     }
+
     return config.allowedIPs.indexOf(normalizeIp(ip)) !== -1;
 }
 
 async function getAdminPayload() {
     const resolved = getResolvedConfig();
     const defaults = envDefaults();
+
     return {
-        _id: cache.doc && cache.doc._id ? String(cache.doc._id) : null,
+        _id: cache.doc && cache.doc._id
+            ? String(cache.doc._id)
+            : null,
         key: resolved.key || 'default',
         source: cache.source || 'environment',
         persisted: !!cache.persisted,
@@ -243,8 +308,12 @@ async function getAdminPayload() {
             allowedIPs: defaults.allowedIPs.slice()
         },
         insights: await runtimeAccessMonitor.getAdminInsights(),
-        create: cache.doc && cache.doc.create ? cache.doc.create : undefined,
-        update: cache.doc && cache.doc.update ? cache.doc.update : undefined
+        create: cache.doc && cache.doc.create
+            ? cache.doc.create
+            : undefined,
+        update: cache.doc && cache.doc.update
+            ? cache.doc.update
+            : undefined
     };
 }
 
@@ -269,7 +338,10 @@ module.exports = {
         return loadFromDatabase(true);
     },
     updateCacheFromDocument: function (doc) {
-        return updateCache(doc || null, doc ? 'database' : 'environment');
+        return updateCache(
+            doc || null,
+            doc ? 'database' : 'environment'
+        );
     },
     getResolvedConfig,
     getAdminPayload,

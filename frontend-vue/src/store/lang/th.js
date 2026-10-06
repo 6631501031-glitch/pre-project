@@ -124,6 +124,7 @@ const th = {
         messageStatus: "สถานะข้อความ",
         accounts: "บัญชีผู้ใช้",
         accountDirectory: "สารบบบัญชี",
+        permissionMatrix: "ตารางสิทธิ์การใช้งาน",
         identityLifecycle: "วงจรตัวตน",
         training: "การอบรม",
         trainingRequests: "คำขออบรม",
@@ -237,6 +238,16 @@ const th = {
     },
     accounts: {
         directory: {
+            adminPresence: {
+                title: "บัญชีผู้ดูแลระบบ",
+                listTitle: "ผู้ดูแลระบบที่เข้าสู่ระบบอยู่",
+                online: "ผู้ดูแลระบบออนไลน์",
+                onlineCount: "ออนไลน์ {count} คน",
+                active: "กำลังใช้งาน",
+                empty: "ไม่มีผู้ดูแลระบบที่เข้าสู่ระบบอยู่",
+                loadError: "โหลดรายชื่อผู้ดูแลระบบที่กำลังใช้งานไม่สำเร็จ",
+                refresh: "รีเฟรช"
+            },
             title: "สารบบบัญชี",
             subtitle: "ตรวจสอบข้อมูลบัญชีและสิทธิ์ที่มาจาก IAM โดยไม่เก็บ identity master ซ้ำใน GRADUATIONSYSTEMUSINGFACERECOGNITIONGRADUATIONSYSTEMUSINGFACERECOGNITION",
             table: {
@@ -1077,7 +1088,6 @@ th.graduation = {
             specialHint: "เลือกสถานะหมายเลข 20",
             assisted: "ระบุประเภทช่วยเหลือ",
             assistedHint: "เลือกหมายเลข 21-24",
-            foodAllergy: "แพ้อาหาร",
             foodAllergyHint: "รายการที่แจ้งแพ้อาหาร"
         },
         details: {

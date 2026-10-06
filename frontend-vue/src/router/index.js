@@ -23,6 +23,7 @@ const BusinessOperations = () => import('@/projects/views/operations/BusinessOpe
 const CreateMenu = () => import('@/projects/views/security/CreateMenu')
 const CreateGroup = () => import('@/projects/views/security/CreateGroup')
 const PermissionMatrix = () => import('@/projects/views/security/PermissionMatrix')
+const AssignmentManagement = () => import('@/projects/views/security/AssignmentManagement')
 const AuditExplorer = () => import('@/projects/views/security/AuditExplorer')
 const SettingMessageAuthen = () => import('@/projects/views/setting/MessageAuthen')
 const EmailNotifications = () => import('@/projects/views/setting/EmailNotifications')
@@ -131,6 +132,12 @@ const router = new Router({
           name: 'Permission Matrix',
           meta: { permission: { path: '/security/permissions/matrix', action: 'view' } },
           component: PermissionMatrix
+        },
+        {
+          path: 'security/permissions/assignments',
+          name: 'Permission Assignments',
+          meta: { permission: { path: '/security/permission', action: 'view' } },
+          component: AssignmentManagement
         },
         {
           path: 'security/audit',

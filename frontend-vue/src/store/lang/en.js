@@ -122,6 +122,7 @@ const en = {
         messageStatus: "Message Status",
         accounts: "Accounts",
         accountDirectory: "Account Directory",
+        permissionMatrix: "Permission Matrix",
         identityLifecycle: "Identity Lifecycle",
         training: "Training",
         trainingRequests: "Training Requests",
@@ -235,6 +236,16 @@ const en = {
     },
     accounts: {
         directory: {
+            adminPresence: {
+                title: "Admin accounts",
+                listTitle: "Admins currently signed in",
+                online: "Admins online",
+                onlineCount: "{count} online",
+                active: "Active",
+                empty: "No admins are currently signed in",
+                loadError: "Could not load the active admin list.",
+                refresh: "Refresh"
+            },
             title: "Account Directory",
             subtitle: "Review account records and effective access from IAM without storing identity master data in GRADUATIONSYSTEMUSINGFACERECOGNITIONGRADUATIONSYSTEMUSINGFACERECOGNITION.",
             table: {
@@ -1075,7 +1086,6 @@ en.graduation = {
             specialHint: "Selected status code 20",
             assisted: "Assistance type set",
             assistedHint: "Selected code 21-24",
-            foodAllergy: "Food allergy",
             foodAllergyHint: "Records with food allergy declared"
         },
         details: {
