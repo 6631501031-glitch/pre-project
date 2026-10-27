@@ -10,7 +10,7 @@ const defaultApiBaseUrl = typeof window !== 'undefined' && window.location && wi
   ? `http://${window.location.hostname}:8206`
   : 'http://127.0.0.1:8206';
 
-instance.defaults.baseURL = process.env.VUE_APP_API_BASE_URL || defaultApiBaseUrl;
+instance.defaults.baseURL = '/';
 instance.defaults.withCredentials = true;
 
 instance.defaults.headers = {

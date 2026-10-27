@@ -256,6 +256,7 @@
 <script>
 import api from '@/service/api'
 import GraduateCeremonyPreferences from './GraduateCeremonyPreferences.vue'
+import { SCHOOL_PROGRAM_CATALOG } from './school-program-catalog'
 import { notifyError } from '@/projects/utils/notify'
 
 const CEREMONY_STATUS_OPTIONS = [
@@ -312,19 +313,6 @@ function normalizeCeremonyStatus(value) {
 function cleanTextOption(value) {
   const normalized = String(value || '').trim()
   return normalized && normalized !== '-' ? normalized : ''
-}
-
-function uniqueLocalizedOptions(rows, valueKey, labelKey, isEnglish) {
-  const map = new Map()
-  ;(rows || []).forEach(item => {
-    const value = cleanTextOption(item && item[valueKey])
-    if (!value || map.has(value)) return
-    const label = isEnglish ? cleanTextOption(item && item[labelKey]) || value : value
-    map.set(value, label)
-  })
-  return Array.from(map.entries())
-    .sort((left, right) => left[1].localeCompare(right[1], isEnglish ? 'en' : 'th'))
-    .map(([value, label]) => ({ value, label }))
 }
 
 export default {
@@ -394,17 +382,18 @@ export default {
     schoolFilterOptions () {
       return [
         { label: this.$t('graduation.admin.filters.allSchools'), value: 'all' },
-        ...uniqueLocalizedOptions(this.filterSourceRegistrations, 'school', 'schoolEnglish', this.isEnglishLocale)
+        ...SCHOOL_PROGRAM_CATALOG.map(item => ({ value: item.school, label: item.school }))
       ]
     },
     programFilterOptions () {
       const selectedSchool = this.filters.school
-      const rows = selectedSchool && selectedSchool !== 'all'
-        ? this.filterSourceRegistrations.filter(item => item.school === selectedSchool)
-        : this.filterSourceRegistrations
+      const catalogRows = selectedSchool && selectedSchool !== 'all'
+        ? SCHOOL_PROGRAM_CATALOG.filter(item => item.school === selectedSchool)
+        : SCHOOL_PROGRAM_CATALOG
+      const catalogPrograms = catalogRows.reduce((programs, item) => programs.concat(item.programs), [])
       return [
         { label: this.$t('graduation.admin.filters.allPrograms'), value: 'all' },
-        ...uniqueLocalizedOptions(rows, 'program', 'programEnglish', this.isEnglishLocale)
+        ...catalogPrograms.map(program => ({ value: program, label: program }))
       ]
     },
     statCards () {

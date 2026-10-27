@@ -61,7 +61,11 @@ export default {
       commit('assignments', assignments.map(mapAssignment))
       commit('accounts', accounts.map(item => ({
         _id: item && item._id ? String(item._id) : '',
-        label: getAccountLabel(item)
+        label: getAccountLabel(item),
+        email: item && item.email ? String(item.email) : '',
+        code: item && item.code ? String(item.code) : '',
+        initial: String((item && (item.email || item.code)) || getAccountLabel(item)).charAt(0).toUpperCase(),
+        role: item && item.roles ? item.roles : null
       })))
       return true
     },

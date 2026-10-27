@@ -12,7 +12,7 @@ var runtimeAccessMonitor = require('./helpers/runtime-access-monitor');
  */
 
 
-var port = cfg.host.port;
+var port = Number(process.env.PORT) || 8206;
 
 // var options = {
 //     key : fs.readFileSync('/etc/letsencrypt/live/finnext.io/privkey.pem'),
