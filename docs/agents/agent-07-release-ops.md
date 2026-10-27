@@ -65,7 +65,7 @@ Docker/server:
 APP_ENV=prod ./server.sh
 ./server.sh ps
 ./server.sh logs
-curl -i http://127.0.0.1:${BACKEND_PORT:-8081}/healthz
+curl -i http://127.0.0.1:${BACKEND_PORT:-8080}/healthz
 ```
 
 CI/CD:
